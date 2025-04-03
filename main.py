@@ -171,12 +171,12 @@ setup_telegram()
 set_webhook()
 
 # Ejecutar Flask en un hilo aparte
-if os.getenv("GAE_ENV", "").startswith("standard"):  # Solo si está en Google App Engine
+if os.getenv("GAE_ENV", "").startswith("standard"):  # Si está en Google App Engine
     logger.info("🚀 Ejecutando en Google App Engine")
+    threading.Thread(target=run_bot).start()  # Ejecuta el bot en un hilo en GAE
 else:
     if __name__ == "__main__":
         logger.info("🚀 Ejecutando en local")
-        # Ejecutar Flask en un hilo
         threading.Thread(target=lambda: app.run(host="0.0.0.0", port=8080, debug=True)).start()
-        # Ejecutar el bot de Telegram
-        run_bot()
+        run_bot()  # Ejecuta el bot en local normalmente
+
