@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify
 import json
 import logging
-import asyncio
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -26,6 +25,17 @@ app = Flask(__name__)
 # Configurar logging
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Crear un manejador de archivo para los logs
+file_handler = logging.FileHandler('/tmp/app.log')  # Ruta para Google Cloud
+file_handler.setLevel(logging.INFO)
+
+# Crear un formateador
+formatter = logging.Formatter('%(asctime)s - %(message)s')
+file_handler.setFormatter(formatter)
+
+# Agregar el manejador al logger
+logger.addHandler(file_handler)
 
 # Estados de la conversación
 TEMA, CONFIRMAR_TEMA, GENERAR_POST = range(3)
@@ -92,9 +102,7 @@ async def confirmar_tema(update: Update, context: CallbackContext) -> int:
 async def generar_post(update: Update, context: CallbackContext) -> int:
     tema = context.user_data.get("tema", "un tema interesante")
     try:
-        client = openai.OpenAI()  # Nuevo objeto cliente
-
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(  # Aquí debería ser openai.ChatCompletion
             model="gpt-3.5-turbo",
             messages=[{
                 "role": "system",
@@ -106,7 +114,7 @@ async def generar_post(update: Update, context: CallbackContext) -> int:
             max_tokens=1000
         )
 
-        post_generado = response.choices[0].message.content
+        post_generado = response.choices[0].message['content']  # Corregido
         await update.effective_message.reply_text(f"✍️ Aquí tienes un post generado:\n\n{post_generado}")
 
     except Exception as e:
@@ -159,7 +167,8 @@ def webhook():
     try:
         json_data = json.loads(json_str)
         update = Update.de_json(json_data, application.bot)
-        application.update_queue.put(update)  # Esto se puede manejar con polling en lugar de async
+        # Usamos process_update para manejar el update correctamente
+        application.process_update(update)  # Procesamos el update en lugar de usar la cola
     except json.JSONDecodeError:
         logger.error("❌ Error al decodificar el JSON")
         return jsonify({'status': 'error', 'message': 'Invalid JSON'}), 400
@@ -171,19 +180,14 @@ def webhook():
 @app.route('/debug', methods=['GET'])
 def debug():
     # Mostrar logs recientes
-    with open("appengine_log.txt", "r") as file:
-        logs = file.readlines()
-    return jsonify({'logs': logs}), 200
-
-@app.route('/logs', methods=['GET'])
-def view_logs():
     try:
-        with open("log.py", "r") as file:
+        with open("/tmp/app.log", "r") as file:
             logs = file.readlines()
         return jsonify({'logs': logs}), 200
     except Exception as e:
         logger.error(f"Error leyendo el archivo de logs: {e}")
         return jsonify({'status': 'error', 'message': 'Could not read logs'}), 500
+
 
 if __name__ == "__main__":
     setup_telegram()
@@ -193,4 +197,3 @@ if __name__ == "__main__":
 
     # Ejecutar la app de Flask
     app.run(host="0.0.0.0", port=8080, debug=True)
-
