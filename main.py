@@ -4,7 +4,7 @@ import json
 import asyncio
 import threading
 import requests
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
@@ -108,6 +108,14 @@ async def cancel(update: Update, context: CallbackContext) -> int:
     await update.message.reply_text("La conversación ha sido cancelada. Puedes comenzar de nuevo en cualquier momento con /start.")
     return ConversationHandler.END
 
+# 📌 Ruta para ver los logs
+@app.route('/logs')
+def view_logs():
+    try:
+        return send_from_directory('/tmp', 'app.log', as_attachment=True)
+    except FileNotFoundError:
+        return "No se encontraron logs disponibles.", 404
+
 # 📌 Configurar manejadores de Telegram
 def setup_telegram():
     logger.info("⚙️ Configurando Telegram...")
@@ -168,4 +176,3 @@ if __name__ == "__main__":
 
         # Ejecutar el bot de Telegram (en el hilo principal)
         application.run_polling()
-
