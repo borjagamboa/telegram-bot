@@ -38,7 +38,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Log inicial para verificar si el logging está funcionando
-logger.info("🚀 La aplicacion ha iniciado correctamente y el logging esta activo.")
+logger.info("🚀 El logging esta activo.")
 
 # Estados de la conversación
 TEMA, CONFIRMAR_TEMA, GENERAR_POST = range(3)
@@ -46,6 +46,7 @@ TEMA, CONFIRMAR_TEMA, GENERAR_POST = range(3)
 # Crear instancia del bot
 application = Application.builder().token(TOKEN).build()
 
+logger.info("🚀 La aplicación se ha iniciado.")
 
 # 📌 Comando /start
 async def start(update: Update, context: CallbackContext) -> None:
@@ -147,6 +148,7 @@ def setup_telegram():
 
     application.add_handler(conversation_handler)
     application.add_handler(CommandHandler("cancel", cancel))
+    logger.info("🚀 Telegram configurado correctamente.")
 
 
 # 📌 Configurar el webhook
