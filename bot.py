@@ -139,9 +139,9 @@ def setup_telegram():
 
 
 # 📌 Configurar el webhook
-async def set_webhook():
+def set_webhook():
     webhook_url = f"https://{PROJECT_ID}.appspot.com/{TOKEN}"  # Usa la URL de tu app
-    await application.bot.set_webhook(webhook_url)
+    application.bot.set_webhook(webhook_url)
     logger.info(f"✅ Webhook configurado en: {webhook_url}")
 
 
@@ -152,19 +152,20 @@ def home():
 
 # 📌 Ruta de Webhook en Flask
 @app.route('/' + TOKEN, methods=['POST'])
-async def webhook():
+def webhook():
     json_str = request.get_data(as_text=True)
     logger.info(f"📩 Datos recibidos en webhook: {json_str}")  # Log de lo recibido
 
     try:
         json_data = json.loads(json_str)
         update = Update.de_json(json_data, application.bot)
-        await application.update_queue.put(update)
+        application.update_queue.put(update)  # Esto se puede manejar con polling en lugar de async
     except json.JSONDecodeError:
         logger.error("❌ Error al decodificar el JSON")
         return jsonify({'status': 'error', 'message': 'Invalid JSON'}), 400
 
     return jsonify({'status': 'ok'}), 200
+
 
 
 # 📌 Ruta de depuración en Flask
@@ -179,15 +180,9 @@ def debug():
 if __name__ == "__main__":
     setup_telegram()
 
-    # Crear un loop de eventos
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    # Iniciar el webhook de Telegram
+    set_webhook()
 
-    # Configurar webhook
-    loop.run_until_complete(set_webhook())
-
-    # Ejecutar `application` en un hilo separado
-    asyncio.create_task(application.run_polling(allowed_updates=Update.ALL_TYPES))
-
-    # Iniciar Flask
+    # Ejecutar la app de Flask
     app.run(host="0.0.0.0", port=8080, debug=True)
+
