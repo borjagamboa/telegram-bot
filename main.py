@@ -1,8 +1,9 @@
 import logging
-import asyncio
 import os
 import json
+import asyncio
 import threading
+import requests
 from flask import Flask, request, jsonify
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -38,9 +39,7 @@ logger = logging.getLogger(__name__)
 TEMA, CONFIRMAR_TEMA, GENERAR_POST = range(3)
 
 # ✅ Iniciar bot
-logger.info("Iniciando la aplicacion de Telegram...")
-
-# Crear el objeto Application
+logger.info("Iniciando la aplicación de Telegram...")
 application = Application.builder().token(TOKEN).build()
 
 # 📌 Comando /start
@@ -104,9 +103,9 @@ async def generar_post(update: Update, context: CallbackContext) -> int:
         await update.effective_message.reply_text("❌ Error generando el post. Inténtalo de nuevo.")
     return ConversationHandler.END
 
-# 📌 Función de cancelación
+# 📌 Función para cancelar la conversación
 async def cancel(update: Update, context: CallbackContext) -> int:
-    await update.message.reply_text("La conversación ha sido cancelada. Si deseas comenzar de nuevo, usa el comando /start.")
+    await update.message.reply_text("La conversación ha sido cancelada. Puedes comenzar de nuevo en cualquier momento con /start.")
     return ConversationHandler.END
 
 # 📌 Configurar manejadores de Telegram
@@ -119,17 +118,16 @@ def setup_telegram():
             CONFIRMAR_TEMA: [CallbackQueryHandler(confirmar_tema)],
             GENERAR_POST: [MessageHandler(filters.TEXT & ~filters.COMMAND, generar_post)]
         },
-        fallbacks=[CommandHandler("cancel", cancel)]
+        fallbacks=[CommandHandler("cancel", cancel)]  # Agregado el comando de cancelación
     )
     application.add_handler(conversation_handler)
     application.add_handler(CommandHandler("cancel", cancel))
     logger.info("✅ Telegram configurado.")
 
 # 📌 Configurar webhook
-def set_webhook():
-    webhook_url = f"https://{PROJECT_ID}.appspot.com/{TOKEN}"
-    logger.info(f"⚙️ Configurando Webhook en: {webhook_url}")
-    application.bot.set_webhook(webhook_url)
+def set_webhook(url):
+    logger.info(f"⚙️ Configurando Webhook en: {url}")
+    application.bot.set_webhook(url)
     logger.info("✅ Webhook configurado.")
 
 # 📌 Ruta principal de Flask
@@ -138,53 +136,36 @@ def home():
     return 'Funcionando correctamente'
 
 # 📌 Ruta para recibir Webhook de Telegram
-@app.route('/' + TOKEN, methods=['POST'])
+@app.route(f'/{TOKEN}', methods=['POST'])
 def webhook():
     json_str = request.get_data(as_text=True)
-    logger.info(f"📩 Webhook recibido: {json_str}")
-    try:
-        update = Update.de_json(json.loads(json_str), application.bot)
-        application.update_queue.put(update)
-    except json.JSONDecodeError:
-        logger.error("❌ Error al decodificar JSON")
-        return jsonify({'status': 'error', 'message': 'Invalid JSON'}), 400
+    update = Update.de_json(json.loads(json_str), application.bot)
+    application.update_queue.put(update)
     return jsonify({'status': 'ok'}), 200
 
-# 📌 Ruta de depuración en Flask
-@app.route('/debug', methods=['GET'])
-def debug():
-    # Mostrar logs recientes
-    try:
-        with open("/tmp/app.log", "r") as file:
-            logs = file.readlines()
-        return jsonify({'logs': logs}), 200
-    except Exception as e:
-        logger.error(f"Error leyendo el archivo de logs: {e}")
-        return jsonify({'status': 'error', 'message': 'Could not read logs'}), 500
+# 📌 Ejecutar Flask y bot de Telegram en hilos diferentes
+def run_flask():
+    app.run(host="0.0.0.0", port=8080, debug=True, threaded=True)
 
-# 📌 Iniciar bot en hilo separado
-def run_bot():
-    logger.info("Iniciando bot de Telegram en modo polling...")
-    
-    # Crear un nuevo loop de asyncio
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
-    # Iniciar polling
-    loop.run_until_complete(application.run_polling())
-
-
-# Configurar bot de Telegram
-setup_telegram()
-set_webhook()
-
-# Ejecutar Flask en un hilo aparte
-if os.getenv("GAE_ENV", "").startswith("standard"):  # Si está en Google App Engine
-    logger.info("🚀 Ejecutando en Google App Engine")
-    threading.Thread(target=run_bot).start()  # Ejecuta el bot en un hilo en GAE
-else:
-    if __name__ == "__main__":
+# Iniciar bot y Flask
+if __name__ == "__main__":
+    if os.getenv("GAE_ENV", "").startswith("standard"):
+        logger.info("🚀 Ejecutando en Google App Engine")
+        set_webhook(f"https://{PROJECT_ID}.appspot.com/{TOKEN}")
+        run_flask()
+    else:
         logger.info("🚀 Ejecutando en local")
-        threading.Thread(target=lambda: app.run(host="0.0.0.0", port=8080, debug=True)).start()
-        run_bot()  # Ejecuta el bot en local normalmente
+        # Instalar y lanzar ngrok automáticamente
+        from pyngrok import ngrok
+        public_url = ngrok.connect(8080).public_url
+        logger.info(f"🌍 ngrok iniciado en: {public_url}")
+
+        # Configurar el webhook con ngrok
+        set_webhook(f"{public_url}/{TOKEN}")
+
+        # Ejecutar Flask en un hilo
+        threading.Thread(target=run_flask).start()
+
+        # Ejecutar el bot de Telegram (en el hilo principal)
+        application.run_polling()
 
