@@ -46,7 +46,7 @@ TEMA, CONFIRMAR_TEMA, GENERAR_POST = range(3)
 # Crear instancia del bot
 application = Application.builder().token(TOKEN).build()
 
-logger.info("🚀 La aplicación se ha iniciado.")
+logger.info("🚀 La aplicacion se ha iniciado.")
 
 # 📌 Comando /start
 async def start(update: Update, context: CallbackContext) -> None:
@@ -136,6 +136,7 @@ async def cancel(update: Update, context: CallbackContext) -> int:
 
 # Configuración del manejador de Telegram
 def setup_telegram():
+    logger.info("Configurando Telegram.")
     conversation_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start), CallbackQueryHandler(button)],
         states={
@@ -148,7 +149,7 @@ def setup_telegram():
 
     application.add_handler(conversation_handler)
     application.add_handler(CommandHandler("cancel", cancel))
-    logger.info("🚀 Telegram configurado correctamente.")
+    logger.info("Telegram configurado correctamente.")
 
 
 # 📌 Configurar el webhook
