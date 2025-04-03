@@ -15,7 +15,7 @@ import openai
 # 🔑 Sustituye por tu token de Telegram y API Key de OpenAI
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
 
 # Configurar OpenAI
 openai.api_key = OPENAI_API_KEY
@@ -140,7 +140,7 @@ def setup_telegram():
 
 # 📌 Configurar el webhook
 async def set_webhook():
-    webhook_url = f"https://<YOUR_PROJECT_ID>.appspot.com/{TOKEN}"  # Usa la URL de tu app
+    webhook_url = f"https://{PROJECT_ID}.appspot.com/{TOKEN}"  # Usa la URL de tu app
     await application.bot.set_webhook(webhook_url)
     logger.info(f"✅ Webhook configurado en: {webhook_url}")
 
