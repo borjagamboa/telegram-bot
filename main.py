@@ -159,9 +159,6 @@ def run_bot():
     logger.info("Iniciando bot de Telegram...")
     application.run_polling()
 
-# Configurar Flask
-app = Flask(__name__)
-
 # Configurar bot de Telegram
 setup_telegram()
 set_webhook()
