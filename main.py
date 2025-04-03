@@ -112,9 +112,12 @@ async def cancel(update: Update, context: CallbackContext) -> int:
 @app.route('/logs')
 def view_logs():
     try:
-        return send_from_directory('/tmp', 'app.log', as_attachment=True)
+        with open(log_file, 'r') as file:
+            log_content = file.read()  # Leer todo el contenido del archivo de log
+        return f"<pre>{log_content}</pre>", 200  # Mostrar los logs en formato de texto plano
     except FileNotFoundError:
         return "No se encontraron logs disponibles.", 404
+
 
 # 📌 Configurar manejadores de Telegram
 def setup_telegram():
