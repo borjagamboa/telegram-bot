@@ -38,7 +38,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Log inicial para verificar si el logging está funcionando
-logger.info("🚀 La aplicación ha iniciado correctamente y el logging está activo.")
+logger.info("🚀 La aplicacion ha iniciado correctamente y el logging esta activo.")
 
 # Estados de la conversación
 TEMA, CONFIRMAR_TEMA, GENERAR_POST = range(3)
@@ -151,6 +151,7 @@ def setup_telegram():
 
 # 📌 Configurar el webhook
 def set_webhook():
+    logger.info(f" Intentando configurar Webhook en: {webhook_url}")
     webhook_url = f"https://{PROJECT_ID}.appspot.com/{TOKEN}"  # Usa la URL de tu app
     application.bot.set_webhook(webhook_url)
     logger.info(f"✅ Webhook configurado en: {webhook_url}")
