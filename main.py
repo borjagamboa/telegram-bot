@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 TEMA, CONFIRMAR_TEMA, GENERAR_POST = range(3)
 
 # ✅ Iniciar bot
-logger.info("🚀 Iniciando la aplicación de Telegram...")
+logger.info("Iniciando la aplicacion de Telegram...")
 application = Application.builder().token(TOKEN).build()
 
 # 📌 Comando /start
@@ -156,14 +156,20 @@ def debug():
 
 # 📌 Iniciar bot en hilo separado
 def run_bot():
-    logger.info("🟢 Iniciando bot de Telegram...")
+    logger.info("Iniciando bot de Telegram...")
     application.run_polling()
 
-# 📌 Ejecutar todo
-if __name__ == "__main__":
-    logger.info("🟢 Ejecutando script principal...")
-    setup_telegram()
-    threading.Thread(target=run_bot, daemon=True).start()
-    set_webhook()
-    logger.info("🟢 Ejecutando Flask...")
-    app.run(host="0.0.0.0", port=8080, debug=True)
+# Configurar Flask
+app = Flask(__name__)
+
+# Configurar bot de Telegram
+setup_telegram()
+set_webhook()
+
+# Ejecutar la aplicación
+if os.getenv("GAE_ENV", "").startswith("standard"):  # Solo si está en Google App Engine
+    logger.info("🚀 Ejecutando en Google App Engine")
+else:
+    if __name__ == "__main__":
+        logger.info("🚀 Ejecutando en local")
+        app.run(host="0.0.0.0", port=8080, debug=True)
