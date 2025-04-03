@@ -142,6 +142,18 @@ def webhook():
         return jsonify({'status': 'error', 'message': 'Invalid JSON'}), 400
     return jsonify({'status': 'ok'}), 200
 
+# 📌 Ruta de depuración en Flask
+@app.route('/debug', methods=['GET'])
+def debug():
+    # Mostrar logs recientes
+    try:
+        with open("/tmp/app.log", "r") as file:
+            logs = file.readlines()
+        return jsonify({'logs': logs}), 200
+    except Exception as e:
+        logger.error(f"Error leyendo el archivo de logs: {e}")
+        return jsonify({'status': 'error', 'message': 'Could not read logs'}), 500
+
 # 📌 Iniciar bot en hilo separado
 def run_bot():
     logger.info("🟢 Iniciando bot de Telegram...")
@@ -149,6 +161,7 @@ def run_bot():
 
 # 📌 Ejecutar todo
 if __name__ == "__main__":
+    logger.info("🟢 Ejecutando script principal...")
     setup_telegram()
     threading.Thread(target=run_bot, daemon=True).start()
     set_webhook()
