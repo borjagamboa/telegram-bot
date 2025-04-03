@@ -167,7 +167,6 @@ def webhook():
     return jsonify({'status': 'ok'}), 200
 
 
-
 # 📌 Ruta de depuración en Flask
 @app.route('/debug', methods=['GET'])
 def debug():
@@ -176,6 +175,12 @@ def debug():
         logs = file.readlines()
     return jsonify({'logs': logs}), 200
 
+# Ruta de depuración en Flask
+@app.route('/logs', methods=['GET'])
+def view_logs():
+    with open("app.log", "r") as file:
+        logs = file.readlines()
+    return jsonify({'logs': logs}), 200
 
 if __name__ == "__main__":
     setup_telegram()
