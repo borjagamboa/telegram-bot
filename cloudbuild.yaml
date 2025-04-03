@@ -6,5 +6,5 @@ timeout: '1600s'
 
 options:
   logging: GCS_ONLY
-
+ 
 logsBucket: "gs://build-logs-bucket-bot"
