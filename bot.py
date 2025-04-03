@@ -145,6 +145,11 @@ async def set_webhook():
     logger.info(f"✅ Webhook configurado en: {webhook_url}")
 
 
+@app.route('/')
+def home():
+    return 'Funcionando correctamente'
+
+
 # 📌 Ruta de Webhook en Flask
 @app.route('/' + TOKEN, methods=['POST'])
 async def webhook():
