@@ -196,8 +196,9 @@ def debug():
 
 
 if __name__ == "__main__":
+    logger.info("Antes de configurar Telegram.")
     setup_telegram()
-
+    logger.info("Despues de configurar Telegram.")
     # Iniciar el webhook de Telegram
     set_webhook()
 
