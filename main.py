@@ -38,6 +38,8 @@ TEMA, CONFIRMAR_TEMA, GENERAR_POST = range(3)
 
 # ✅ Iniciar bot
 logger.info("Iniciando la aplicacion de Telegram...")
+
+# Crear el objeto Application
 application = Application.builder().token(TOKEN).build()
 
 # 📌 Comando /start
@@ -99,6 +101,11 @@ async def generar_post(update: Update, context: CallbackContext) -> int:
     except Exception as e:
         logger.error(f"❌ Error con OpenAI: {e}")
         await update.effective_message.reply_text("❌ Error generando el post. Inténtalo de nuevo.")
+    return ConversationHandler.END
+
+# 📌 Función de cancelación
+async def cancel(update: Update, context: CallbackContext) -> int:
+    await update.message.reply_text("La conversación ha sido cancelada. Si deseas comenzar de nuevo, usa el comando /start.")
     return ConversationHandler.END
 
 # 📌 Configurar manejadores de Telegram
@@ -163,10 +170,13 @@ def run_bot():
 setup_telegram()
 set_webhook()
 
-# Ejecutar la aplicación
+# Ejecutar Flask en un hilo aparte
 if os.getenv("GAE_ENV", "").startswith("standard"):  # Solo si está en Google App Engine
     logger.info("🚀 Ejecutando en Google App Engine")
 else:
     if __name__ == "__main__":
         logger.info("🚀 Ejecutando en local")
-        app.run(host="0.0.0.0", port=8080, debug=True)
+        # Ejecutar Flask en un hilo
+        threading.Thread(target=lambda: app.run(host="0.0.0.0", port=8080, debug=True)).start()
+        # Ejecutar el bot de Telegram
+        run_bot()
