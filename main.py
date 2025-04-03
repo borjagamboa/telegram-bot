@@ -1,4 +1,5 @@
 import logging
+import asyncio
 import os
 import json
 import threading
@@ -163,8 +164,15 @@ def debug():
 
 # 📌 Iniciar bot en hilo separado
 def run_bot():
-    logger.info("Iniciando bot de Telegram...")
-    application.run_polling()
+    logger.info("Iniciando bot de Telegram en modo polling...")
+    
+    # Crear un nuevo loop de asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    # Iniciar polling
+    loop.run_until_complete(application.run_polling())
+
 
 # Configurar bot de Telegram
 setup_telegram()
