@@ -38,7 +38,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Log inicial para verificar si el logging está funcionando
-logger.info("🚀 El logging esta activo.")
+logger.info("El logging esta activo.")
 
 # Estados de la conversación
 TEMA, CONFIRMAR_TEMA, GENERAR_POST = range(3)
@@ -46,11 +46,11 @@ TEMA, CONFIRMAR_TEMA, GENERAR_POST = range(3)
 # Crear instancia del bot
 application = Application.builder().token(TOKEN).build()
 
-logger.info("🚀 La aplicacion se ha iniciado.")
+logger.info("La aplicacion se ha iniciado.")
 
 # 📌 Comando /start
 async def start(update: Update, context: CallbackContext) -> None:
-    logger.info(f"🚀 /start recibido de {update.message.from_user.first_name} ({update.message.from_user.id})")
+    logger.info(f" /start recibido de {update.message.from_user.first_name} ({update.message.from_user.id})")
     await update.message.reply_text("¡Hola! ¿Cómo puedo ayudarte?")
 
     keyboard = [
