@@ -22,18 +22,23 @@ openai.api_key = OPENAI_API_KEY
 # Configurar Flask
 app = Flask(__name__)
 
-# Configuración del logging
+import logging
+
+# Configurar el logging
 log_file = '/tmp/app.log'  # Ruta de archivo en Google Cloud (usualmente en /tmp)
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", 
     level=logging.INFO,
     handlers=[
-        logging.StreamHandler(),  # Esto también asegura que los logs se muestren en consola
+        logging.StreamHandler(),  # Esto asegura que los logs también se muestren en consola
         logging.FileHandler(log_file)  # Guardar los logs en un archivo
     ]
 )
 
 logger = logging.getLogger(__name__)
+
+# Log inicial para verificar si el logging está funcionando
+logger.info("🚀 La aplicación ha iniciado correctamente y el logging está activo.")
 
 # Estados de la conversación
 TEMA, CONFIRMAR_TEMA, GENERAR_POST = range(3)
