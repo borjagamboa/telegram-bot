@@ -175,12 +175,15 @@ def debug():
         logs = file.readlines()
     return jsonify({'logs': logs}), 200
 
-# Ruta de depuración en Flask
 @app.route('/logs', methods=['GET'])
 def view_logs():
-    with open("app.log", "r") as file:
-        logs = file.readlines()
-    return jsonify({'logs': logs}), 200
+    try:
+        with open("log.py", "r") as file:
+            logs = file.readlines()
+        return jsonify({'logs': logs}), 200
+    except Exception as e:
+        logger.error(f"Error leyendo el archivo de logs: {e}")
+        return jsonify({'status': 'error', 'message': 'Could not read logs'}), 500
 
 if __name__ == "__main__":
     setup_telegram()
