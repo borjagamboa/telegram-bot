@@ -167,14 +167,13 @@ def webhook():
     try:
         json_data = json.loads(json_str)
         update = Update.de_json(json_data, application.bot)
-        # Usamos process_update para manejar el update correctamente
-        application.process_update(update)  # Procesamos el update en lugar de usar la cola
+        application.update_queue.put(update)  # Esto se puede manejar con polling en lugar de async
     except json.JSONDecodeError:
         logger.error("❌ Error al decodificar el JSON")
         return jsonify({'status': 'error', 'message': 'Invalid JSON'}), 400
 
     return jsonify({'status': 'ok'}), 200
-
+    
 
 # 📌 Ruta de depuración en Flask
 @app.route('/debug', methods=['GET'])
