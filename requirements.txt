@@ -1,7 +1,5 @@
 Flask
 python-telegram-bot==20.0
-requests==2.28.1
 openai
 Werkzeug==2.3.7  # <-- Fijar versión para evitar error
 gunicorn
-
