@@ -126,11 +126,12 @@ def webhook():
     application.update_queue.put(update)
     return jsonify({'status': 'ok'}), 200
 
-# Ejecutar Flask y bot de Telegram en App Engine
+# Ahora no ejecutamos Flask directamente, sino con Gunicorn
+# Este bloque solo debe ejecutarse si el script se corre directamente (no cuando se usa Gunicorn)
 if __name__ == "__main__":
     if os.getenv("GAE_ENV", "").startswith("standard"):
         set_webhook(f"https://{PROJECT_ID}.appspot.com/{TOKEN}")
-        app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 8080)), debug=True)
+        app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 8080)))
     else:
         # Usar ngrok solo si estás corriendo localmente
         from pyngrok import ngrok
