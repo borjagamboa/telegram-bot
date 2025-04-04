@@ -10,8 +10,8 @@ from telegram.ext import (
     CallbackContext, CallbackQueryHandler, ConversationHandler
 )
 import openai
-import sys
-sys.path.insert(0, 'lib')
+#import sys
+#sys.path.insert(0, 'lib')
 
 
 # 🔑 Variables de entorno
@@ -181,3 +181,4 @@ if __name__ == "__main__":
 
         # Ejecutar el bot de Telegram (en el hilo principal)
         application.run_polling()
+
