@@ -1,4 +1,4 @@
-runtime: python310  # Especifica la versión correcta de Python
+runtime: python312  # Especifica la versión correcta de Python
 entrypoint: gunicorn -b :8080 main:app
 
 env_variables:
