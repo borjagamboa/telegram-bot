@@ -3,7 +3,7 @@ import os
 import json
 from flask import Flask, request, jsonify
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, filters
 import openai
 
 # 🔑 Variables de entorno
@@ -86,9 +86,12 @@ async def generar_post(update: Update, context):
         )
         post_generado = response["choices"][0]["message"]["content"]
         await update.effective_message.reply_text(f"✍️ Aquí tienes un post generado:\n\n{post_generado}")
+    except openai.error.OpenAIError as e:
+        logger.error(f"Error con la API de OpenAI: {str(e)}")
+        await update.effective_message.reply_text("❌ Error con la API de OpenAI. Inténtalo de nuevo más tarde.")
     except Exception as e:
-        logger.error(f"❌ Error con OpenAI: {e}")
-        await update.effective_message.reply_text("❌ Error generando el post. Inténtalo de nuevo.")
+        logger.error(f"Error inesperado: {str(e)}")
+        await update.effective_message.reply_text("❌ Error inesperado. Inténtalo de nuevo.")
     return ConversationHandler.END
 
 # 📌 Función para cancelar la conversación
@@ -116,27 +119,18 @@ def set_webhook(url):
 # 📌 Ruta principal de Flask
 @app.route('/')
 def home():
-    return 'Funcionando correctamente'
+    return "Funcionando correctamente"
 
 # 📌 Ruta para recibir Webhook de Telegram
-@app.route(f'/{TOKEN}', methods=['POST'])
+@app.route(f'/{TOKEN}', methods=["POST"])
 def webhook():
     json_str = request.get_data(as_text=True)
     update = Update.de_json(json.loads(json_str), application.bot)
     application.update_queue.put(update)
-    return jsonify({'status': 'ok'}), 200
+    return jsonify({"status": "ok"}), 200
 
-# Ahora no ejecutamos Flask directamente, sino con Gunicorn
-# Este bloque solo debe ejecutarse si el script se corre directamente (no cuando se usa Gunicorn)
+# Ejecutar el servidor Flask para recibir solicitudes del webhook
 if __name__ == "__main__":
-    if os.getenv("GAE_ENV", "").startswith("standard"):
-        set_webhook(f"https://{PROJECT_ID}.appspot.com/{TOKEN}")
-        app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 8080)))
-    else:
-        # Usar ngrok solo si estás corriendo localmente
-        from pyngrok import ngrok
-        public_url = ngrok.connect(8080).public_url
-        set_webhook(f"{public_url}/{TOKEN}")
-        app.run(host="0.0.0.0", port=8080)
-
+    set_webhook(f"https://{PROJECT_ID}.appspot.com/{TOKEN}")
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
 
