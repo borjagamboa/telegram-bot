@@ -10,6 +10,9 @@ from telegram.ext import (
     CallbackContext, CallbackQueryHandler, ConversationHandler
 )
 import openai
+import sys
+sys.path.insert(0, 'lib')
+
 
 # 🔑 Variables de entorno
 TOKEN = os.getenv("TELEGRAM_TOKEN")
