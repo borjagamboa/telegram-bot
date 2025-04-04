@@ -1,5 +1,5 @@
 runtime: python312  # Especifica la versión correcta de Python
-entrypoint: uvicorn main:app --host 0.0.0.0 --port $PORT
+entrypoint: uvicorn app:app --host 0.0.0.0 --port $PORT
 
 env_variables:
   TELEGRAM_TOKEN: "8016737487:AAErN4WYgVkajp6OSKLtvqAlgamyL0DVQdg"
