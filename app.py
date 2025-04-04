@@ -10,8 +10,8 @@ from telegram.ext import (
     CallbackContext, CallbackQueryHandler, ConversationHandler
 )
 import openai
-#import sys
-#sys.path.insert(0, 'lib')
+import sys
+sys.path.insert(0, 'lib')
 
 
 # 🔑 Variables de entorno
@@ -126,7 +126,7 @@ def setup_telegram():
     logger.info("⚙️ Configurando Telegram...")
     conversation_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start), CallbackQueryHandler(button)],
-        states={
+        states={ 
             TEMA: [MessageHandler(filters.TEXT & ~filters.COMMAND, tema)],
             CONFIRMAR_TEMA: [CallbackQueryHandler(confirmar_tema)],
             GENERAR_POST: [MessageHandler(filters.TEXT & ~filters.COMMAND, generar_post)]
@@ -162,10 +162,12 @@ def run_flask():
 
 # Iniciar bot y Flask
 if __name__ == "__main__":
+    import uvicorn
+
     if os.getenv("GAE_ENV", "").startswith("standard"):
         logger.info("🚀 Ejecutando en Google App Engine")
         set_webhook(f"https://{PROJECT_ID}.appspot.com/{TOKEN}")
-        run_flask()
+        uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get('PORT', 8080)))
     else:
         logger.info("🚀 Ejecutando en local")
         # Instalar y lanzar ngrok automáticamente
@@ -176,9 +178,7 @@ if __name__ == "__main__":
         # Configurar el webhook con ngrok
         set_webhook(f"{public_url}/{TOKEN}")
 
-        # Ejecutar Flask en un hilo
-        threading.Thread(target=run_flask).start()
+        # Ejecutar Flask con uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8080)
 
-        # Ejecutar el bot de Telegram (en el hilo principal)
-        application.run_polling()
 
