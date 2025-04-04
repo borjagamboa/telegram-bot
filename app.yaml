@@ -1,5 +1,5 @@
 runtime: python312  # Especifica la versión correcta de Python
-entrypoint: gunicorn -b :8080 main:app
+entrypoint: gunicorn -b :8080 app:app
 
 env_variables:
   TELEGRAM_TOKEN: "8016737487:AAErN4WYgVkajp6OSKLtvqAlgamyL0DVQdg"
