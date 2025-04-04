@@ -3,4 +3,4 @@ python-telegram-bot==20.0
 openai
 Werkzeug==2.3.7  # <-- Fijar versión para evitar error
 gunicorn
-
+uvicorn
