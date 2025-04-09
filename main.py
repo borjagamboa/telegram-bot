@@ -12,6 +12,7 @@ import requests
 from google.cloud import secretmanager
 import openai
 import re
+import time
 
 # Configuración de logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -58,7 +59,7 @@ def generate_content(tema, tone="informativo"):
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[
+            messages=[ 
                 {"role": "system", "content": "Eres un asistente experto en generación de contenido y en neurorrehabilitación. Genera un título atractivo y un contenido para un blog en formato JSON."},
                 {"role": "user", "content": f"Genera un título atractivo y un artículo de blog sobre: {tema}. Devuélvelo en json usando los tags title y content. Máximo 700 palabras. No añadas comentarios"}
             ]
@@ -117,16 +118,29 @@ def start(update, context):
 def handle_message(update, context):
     user_id = update.effective_user.id
     tema = update.message.text.strip()
-    
-    update.message.reply_text("⏳ Generando contenido...")
 
+    # Enviar el primer mensaje de que está generando el contenido
+    loading_message = update.message.reply_text("⏳ Generando contenido...")
+
+    # Animación de puntos, que se actualizará cada 0.5 segundos
+    dots = 0
+    while dots < 3:  # Hacerlo por 3 ciclos (aparecerán 3 puntos)
+        loading_message.edit_text(f"⏳ Generando contenido...{'.' * (dots + 1)}")
+        time.sleep(0.5)  # Pausa de 0.5 segundos
+        dots += 1
+
+    # Realizar el proceso de generación
     title, content = generate_content(tema)
     user_posts[user_id] = {"title": title, "content": content, "tema": tema}
 
+    # Borrar el mensaje de "cargando..." y enviar el contenido generado
+    loading_message.edit_text("⏳ Generando contenido... . . .")  # Aquí aparece la animación de puntos
+
+    # Después de unos segundos, mostrar el contenido
     update.message.reply_text(
         f"📝 <b>Título:</b> {title}\n\n{content}",
         parse_mode=telegram.ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup([
+        reply_markup=InlineKeyboardMarkup([  
             [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
             [InlineKeyboardButton("✏️ Sugerir cambios", callback_data="cambios")],
             [InlineKeyboardButton("🆕 Cambiar tema", callback_data="cambiar")],
@@ -152,7 +166,8 @@ def button_callback(update, context):
         success, response = publish_to_wordpress(post['title'], post['content'], 'publish')
         if success:
             del user_posts[user_id]
-            send_message_in_chunks(bot, user_id, f"✅ ¡Publicado!\n🔗 {response.get('link')}")
+            # Enviar mensaje confirmando que el post fue publicado
+            bot.send_message(chat_id=user_id, text=f"✅ ¡Publicado!\n🔗 {response.get('link')}")
         else:
             send_message_in_chunks(bot, user_id, f"❌ Error al publicar: {response}")
         return ConversationHandler.END
@@ -165,7 +180,7 @@ def button_callback(update, context):
             chat_id=user_id,
             text=f"🔁 <b>Título:</b> {title}\n\n{content}",
             parse_mode=telegram.ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([
+            reply_markup=InlineKeyboardMarkup([  
                 [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
                 [InlineKeyboardButton("✏️ Sugerir cambios", callback_data="cambios")],
                 [InlineKeyboardButton("🆕 Cambiar tema", callback_data="cambiar")],
@@ -222,7 +237,7 @@ def handle_sugerencias(update, context):
         update.message.reply_text(
             f"📝 <b>Título:</b> {title}\n\n{content}",
             parse_mode=telegram.ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([
+            reply_markup=InlineKeyboardMarkup([  
                 [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
                 [InlineKeyboardButton("✏️ Sugerir cambios", callback_data="cambios")],
                 [InlineKeyboardButton("🆕 Cambiar tema", callback_data="cambiar")],
@@ -272,3 +287,4 @@ def set_webhook():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+
