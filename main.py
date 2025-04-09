@@ -87,7 +87,8 @@ def generate_content(tema, tone="informativo"):
         return f"Post sobre {tema}", "Error generando contenido. Intenta más tarde."
 
 def publish_to_wordpress(title, content, status='publish'):
-    api_url = f"{wp_url}/wp-json/wp/v2/posts"
+    #api_url = f"{wp_url}/wp-json/wp/v2/posts"
+    api_url = f"https://ausartneuro.es/wp-json/wp/v2/posts"
     credentials = f"{wp_user}:{wp_password}"
     token = base64.b64encode(credentials.encode())
     headers = {
@@ -109,7 +110,7 @@ def publish_to_wordpress(title, content, status='publish'):
     
     # Log de la respuesta completa para depuración
     logger.info(f"Respuesta de WordPress: {response.status_code}")
-    logger.info(f"Contenido de la respuesta: {response.text}")
+    logger.info(f"Contenido de la respuesta: {response.json()}")  # Cambié esto a json() para obtener el contenido completo
     
     if response.status_code == 201:
         return True, response.json()  # Devuelve el post creado con éxito
