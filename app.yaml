@@ -1,14 +1,5 @@
 runtime: python39
 entrypoint: gunicorn -b :$PORT main:app
 
-env_variables:
-  PROJECT_ID: "rq#3%hFeqUC^t^#*"
-  # Variables de respaldo (mejor usar Secret Manager en producción)
-  TELEGRAM_TOKEN: "8016737487:AAErN4WYgVkajp6OSKLtvqAlgamyL0DVQdg"
-  WORDPRESS_URL: "https:/ausartneuro.es"
-  WORDPRESS_USER: "ausartadmin"
-  WORDPRESS_PASSWORD: "rq#3%hFeqUC^t^#*"
-  OPENAI_API_KEY: "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"
-
 # Configuración de Secret Manager (recomendado para producción)
 service_account: "bot-test-2-455806@appspot.gserviceaccount.com"
