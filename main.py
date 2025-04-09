@@ -22,7 +22,7 @@ app = Flask(__name__)
 user_posts = {}
 
 # Estados para ConversationHandler
-TEMA, PROPUESTA = range(2)
+TEMA, PROPUESTA, SUGERENCIAS = range(3)
 
 def access_secret(secret_id):
     client = secretmanager.SecretManagerServiceClient()
@@ -181,14 +181,20 @@ def button_callback(update, context):
         return TEMA
 
     elif data == "cambios":
-        bot.send_message(chat_id=user_id, text="✏️ Escribe tus sugerencias o cambios:")
-        return "SUGERENCIAS"
+        bot.send_message(chat_id=user_id, text="✏️ Escribe tus sugerencias para mejorar la propuesta actual:")
+        return SUGERENCIAS
 
 def handle_sugerencias(update, context):
     user_id = update.effective_user.id
     sugerencias = update.message.text.strip()
     tema_original = user_posts[user_id]['tema']
-    prompt = f"A partir del tema '{tema_original}', genera una nueva propuesta tomando en cuenta estas sugerencias: {sugerencias}. Devuelve un JSON con 'title' y 'content'."
+    contenido_actual = user_posts[user_id]['content']
+
+    prompt = (
+        f"Este es el contenido anterior de un artículo de blog:\n\n{contenido_actual}\n\n"
+        f"Estas son sugerencias del usuario para mejorarlo:\n{sugerencias}\n\n"
+        "Realiza una versión mejorada teniendo en cuenta las sugerencias. Devuelve un JSON con 'title' y 'content'."
+    )
 
     update.message.reply_text("✏️ Generando nueva propuesta con tus sugerencias...")
 
@@ -224,23 +230,25 @@ def handle_sugerencias(update, context):
         update.message.reply_text("⚠️ Ocurrió un error al procesar tus sugerencias. Inténtalo de nuevo.")
         return PROPUESTA
 
+# Configurar dispatcher y handlers globales
+dispatcher = Dispatcher(bot, None, workers=0)
+
+conv_handler = ConversationHandler(
+    entry_points=[MessageHandler(Filters.command, start)],
+    states={
+        TEMA: [MessageHandler(Filters.text & ~Filters.command, handle_message)],
+        PROPUESTA: [CallbackQueryHandler(button_callback)],
+        SUGERENCIAS: [MessageHandler(Filters.text & ~Filters.command, handle_sugerencias)],
+    },
+    fallbacks=[MessageHandler(Filters.command, start)]
+)
+
+dispatcher.add_handler(conv_handler)
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     if request.method == "POST":
         update = telegram.Update.de_json(request.get_json(force=True), bot)
-        dispatcher = Dispatcher(bot, None, workers=0)
-
-        conv_handler = ConversationHandler(
-            entry_points=[MessageHandler(Filters.command, start)],
-            states={
-                TEMA: [MessageHandler(Filters.text & ~Filters.command, handle_message)],
-                PROPUESTA: [CallbackQueryHandler(button_callback)],
-                "SUGERENCIAS": [MessageHandler(Filters.text & ~Filters.command, handle_sugerencias)],
-            },
-            fallbacks=[MessageHandler(Filters.command, start)]
-        )
-
-        dispatcher.add_handler(conv_handler)
         dispatcher.process_update(update)
     return 'ok'
 
