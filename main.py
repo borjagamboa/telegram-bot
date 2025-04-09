@@ -59,12 +59,12 @@ def generate_content(tema, tone="informativo"):
         )
         title = title_response.choices[0].message.content.strip().replace('"', '')
         content_response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-3.5",
             messages=[
                 {"role": "system", "content": f"Eres un blogger profesional."},
-                {"role": "user", "content": f"Escribe un artículo de blog sobre {tema} titulado '{title}' en formato HTML."}
+                {"role": "user", "content": f"Escribe un artículo de blog sobre {tema} titulado '{title}' en formato HTML y de máximo 700 palabras."}
             ],
-            max_tokens=1000
+            max_tokens=700
         )
         content = content_response.choices[0].message.content.strip()
         if not content.startswith("<"):
