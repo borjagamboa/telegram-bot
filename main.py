@@ -111,6 +111,14 @@ def publish_to_wordpress(title, content, status='publish'):
     else:
         return False, f"Error al publicar: {response.status_code} - {response.text}"
 
+def animate_loading(message, dots_max=3, delay=0.5):
+    dots = 0
+    while True:
+        # Modificar el mensaje con la animación de puntos
+        message.edit_text(f"Generando{'.' * (dots + 1)}")
+        time.sleep(delay)  # Pausa de 0.5 segundos
+        dots = (dots + 1) % dots_max  # Volver al inicio después de 3 puntos
+
 def start(update, context):
     update.message.reply_text("¡Hola! ¿Sobre qué tema quieres generar un post?")
     return TEMA
@@ -122,19 +130,19 @@ def handle_message(update, context):
     # Enviar el primer mensaje de que está generando el contenido
     loading_message = update.message.reply_text("⏳ Generando contenido...")
 
-    # Animación de puntos, que se actualizará cada 0.5 segundos
-    dots = 0
-    while dots < 3:  # Hacerlo por 3 ciclos (aparecerán 3 puntos)
-        loading_message.edit_text(f"⏳ Generando contenido...{'.' * (dots + 1)}")
-        time.sleep(0.5)  # Pausa de 0.5 segundos
-        dots += 1
+    # Ejecutar animación de puntos en un hilo separado
+    context.job_queue.run_repeating(
+        lambda context: animate_loading(loading_message), 
+        interval=1,  # Cada segundo
+        first=0  # Iniciar inmediatamente
+    )
 
     # Realizar el proceso de generación
     title, content = generate_content(tema)
     user_posts[user_id] = {"title": title, "content": content, "tema": tema}
 
     # Borrar el mensaje de "cargando..." y enviar el contenido generado
-    loading_message.edit_text("⏳ Generando contenido... . . .")  # Aquí aparece la animación de puntos
+    loading_message.edit_text("Generando... . . .")  # Aquí aparece la animación de puntos
 
     # Después de unos segundos, mostrar el contenido
     update.message.reply_text(
@@ -163,10 +171,14 @@ def button_callback(update, context):
 
     if data == "publicar":
         query.edit_message_text("📤 Publicando en WordPress...")
+
+        # Animación mientras se publica el post
+        loading_message = query.edit_message_text("⏳ Publicando...")
+        animate_loading(loading_message)
+
         success, response = publish_to_wordpress(post['title'], post['content'], 'publish')
         if success:
             del user_posts[user_id]
-            # Enviar mensaje confirmando que el post fue publicado
             bot.send_message(chat_id=user_id, text=f"✅ ¡Publicado!\n🔗 {response.get('link')}")
         else:
             send_message_in_chunks(bot, user_id, f"❌ Error al publicar: {response}")
@@ -174,6 +186,11 @@ def button_callback(update, context):
 
     elif data == "rehacer":
         bot.send_message(chat_id=user_id, text="♻️ Rehaciendo propuesta, un momento...")
+
+        # Animación para rehacer la propuesta
+        loading_message = bot.send_message(chat_id=user_id, text="⏳ Rehaciendo propuesta...")
+        animate_loading(loading_message)
+
         title, content = generate_content(post['tema'])
         user_posts[user_id] = {"title": title, "content": content, "tema": post['tema']}
         bot.send_message(
@@ -250,6 +267,7 @@ def handle_sugerencias(update, context):
         logger.error(f"Error en sugerencias: {e}")
         update.message.reply_text("⚠️ Ocurrió un error al procesar tus sugerencias. Inténtalo de nuevo.")
         return PROPUESTA
+
 
 
 # Configurar dispatcher y handlers globales
