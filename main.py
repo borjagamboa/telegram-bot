@@ -100,13 +100,17 @@ def publish_to_wordpress(title, content, status='publish'):
         'status': status
     }
     
+    # Log de la solicitud que estamos enviando
+    logger.info(f"Enviando solicitud a WordPress: {api_url}")
+    logger.info(f"Datos del post: {post_data}")
+    
     # Hacer la solicitud POST a WordPress
     response = requests.post(api_url, headers=headers, json=post_data)
-
+    
     # Log de la respuesta completa para depuración
     logger.info(f"Respuesta de WordPress: {response.status_code}")
     logger.info(f"Contenido de la respuesta: {response.text}")
-
+    
     if response.status_code == 201:
         return True, response.json()  # Devuelve el post creado con éxito
     else:
