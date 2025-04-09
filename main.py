@@ -86,7 +86,7 @@ def generate_content(tema, tone="informativo"):
         logger.error(f"Error generando contenido: {e}")
         return f"Post sobre {tema}", "Error generando contenido. Intenta más tarde."
 
-def publish_to_wordpress(title, content, status='draft'):
+def publish_to_wordpress(title, content, status='publish'):
     api_url = f"{wp_url}/wp-json/wp/v2/posts"
     credentials = f"{wp_user}:{wp_password}"
     token = base64.b64encode(credentials.encode())
@@ -94,11 +94,17 @@ def publish_to_wordpress(title, content, status='draft'):
         'Authorization': f'Basic {token.decode("utf-8")}',
         'Content-Type': 'application/json'
     }
-    post_data = {'title': title, 'content': content, 'status': status}
+    post_data = {
+        'title': title, 
+        'content': content, 
+        'status': status
+    }
     response = requests.post(api_url, headers=headers, json=post_data)
     if response.status_code == 201:
-        return True, response.json()
-    return False, response.text
+        return True, response.json()  # Devuelve el post creado con éxito
+    else:
+        return False, response.text  # Devuelve el error en caso de fallo
+
 
 # Comienzo con botón
 def start(update, context):
@@ -143,13 +149,14 @@ def button_callback(update, context):
     post = user_posts[user_id]
 
     if data == "publicar":
-        query.edit_message_text("Publicando en WordPress...")
-        success, response = publish_to_wordpress(post['title'], post['content'], 'publish')
+        query.edit_message_text("Publicando en WordPress...")  # Mensaje mientras se publica
+        success, response = publish_to_wordpress(post['title'], post['content'], 'publish')  # Publicamos el post
+
         if success:
-            del user_posts[user_id]
-            send_message_in_chunks(bot, user_id, f"✅ ¡Publicado!\n🔗 {response.get('link')}")
+            del user_posts[user_id]  # Limpiamos el post después de publicarlo
+            send_message_in_chunks(bot, user_id, f"✅ ¡Publicado!\n🔗 {response.get('link')}")  # Enviamos el enlace del post publicado
         else:
-            send_message_in_chunks(bot, user_id, f"❌ Error: {response}")  # Aquí se muestra el error simplificado
+            send_message_in_chunks(bot, user_id, f"❌ Error al publicar: {response}")  # En caso de error, enviamos el mensaje de error
 
     elif data == "guardar":
         query.edit_message_text("Guardando como borrador...")
