@@ -57,7 +57,7 @@ def generate_content(tema, tone="informativo"):
             model="gpt-3.5-turbo",  # Usamos gpt-3.5-turbo
             messages=[
                 {"role": "system", "content": "Eres un asistente experto en generación de contenido. Genera un título atractivo y un contenido para un blog en formato JSON."},
-                {"role": "user", "content": f"Genera un título atractivo y un artículo de blog sobre: {tema}. Devuélvelo en json y usa los tags title y content. Máximo 700 palabras. No añadas comentarios"}
+                {"role": "user", "content": f"Genera un título atractivo y un artículo de blog sobre: {tema}. Devuélvelo en json usando los tags title y content. Máximo 700 palabras. No añadas comentarios"}
             ]
         )
         
@@ -70,7 +70,7 @@ def generate_content(tema, tone="informativo"):
             title = post_data.get("title", "Título no encontrado")
             content = post_data.get("content", "Contenido no encontrado")
         except json.JSONDecodeError:
-            logger.error("Error al decodificar la respuesta JSON.")
+            logger.error(f"Error al decodificar la respuesta JSON: {response}")
             title = "Error generando título"
             content = "Error generando contenido."
         
@@ -123,7 +123,13 @@ def handle_message(update, context):
             [InlineKeyboardButton("Cancelar", callback_data="cancelar")]
         ])
     )
-
+def send_message_in_chunks(bot, chat_id, text):
+    """Envía el mensaje en fragmentos si es demasiado largo."""
+    max_length = 4096  # El límite de Telegram para un solo mensaje.
+    # Dividir el contenido en trozos más pequeños si es necesario.
+    for i in range(0, len(text), max_length):
+        bot.send_message(chat_id, text[i:i + max_length])
+      
 def button_callback(update, context):
     query = update.callback_query
     query.answer()
@@ -141,9 +147,9 @@ def button_callback(update, context):
         success, response = publish_to_wordpress(post['title'], post['content'], 'publish')
         if success:
             del user_posts[user_id]
-            query.edit_message_text(f"✅ ¡Publicado!\n🔗 {response.get('link')}")
+            send_message_in_chunks(bot, user_id, f"✅ ¡Publicado!\n🔗 {response.get('link')}")
         else:
-            query.edit_message_text(f"❌ Error: {response}")
+            send_message_in_chunks(bot, user_id, f"❌ Error: {response}")  # Aquí se muestra el error simplificado
 
     elif data == "guardar":
         query.edit_message_text("Guardando como borrador...")
