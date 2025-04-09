@@ -208,63 +208,6 @@ def button_callback(update, context):
         bot.send_message(chat_id=user_id, text="✏️ Escribe tus sugerencias para mejorar la propuesta actual:")
         return SUGERENCIAS
 
-def handle_sugerencias(update, context):
-    user_id = update.effective_user.id
-    sugerencias = update.message.text.strip()
-    tema_original = user_posts[user_id]['tema']
-    contenido_actual = user_posts[user_id]['content']
-
-    prompt = (
-        f"Este es el contenido anterior de un artículo de blog:\n\n{contenido_actual}\n\n"
-        f"Estas son sugerencias del usuario para mejorarlo:\n{sugerencias}\n\n"
-        "Realiza una versión mejorada teniendo en cuenta las sugerencias. Devuelve un JSON con 'title' y 'content'."
-    )
-
-    update.message.reply_text("🛠️ Procesando sugerencias...")
-
-    # Llamar a la animación
-    loading_message = update.message.reply_text("⏳ Procesando sugerencias...")
-    show_loading_animation(update, loading_message)
-
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "Eres un asistente experto en contenido de blog. Devuelve el resultado en JSON."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-        content = response['choices'][0]['message']['content'].strip()
-
-        # Validar que el contenido es JSON antes de parsear
-        try:
-            post_data = json.loads(content)
-            title = post_data.get("title", "Título")
-            content = clean_html(post_data.get("content", "Contenido"))
-        except json.JSONDecodeError:
-            logger.error(f"Respuesta no es JSON válida: {content}")
-            update.message.reply_text("⚠️ La respuesta del modelo no es válida. Intenta nuevamente.")
-            return PROPUESTA
-
-        user_posts[user_id] = {"title": title, "content": content, "tema": tema_original}
-
-        update.message.reply_text(
-            f"📝 <b>Título:</b> {title}\n\n{content}",
-            parse_mode=telegram.ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([  
-                [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
-                [InlineKeyboardButton("✏️ Sugerir cambios", callback_data="cambios")],
-                [InlineKeyboardButton("🆕 Cambiar tema", callback_data="cambiar")],
-                [InlineKeyboardButton("✅ Publicar", callback_data="publicar")]
-            ])
-        )
-        return PROPUESTA
-
-    except Exception as e:
-        logger.error(f"Error en sugerencias: {e}")
-        update.message.reply_text("⚠️ Ocurrió un error al procesar tus sugerencias. Inténtalo de nuevo.")
-        return PROPUESTA
-
 
 # Configurar dispatcher y handlers globales
 dispatcher = Dispatcher(bot, None, workers=0)
@@ -282,6 +225,5 @@ conv_handler = ConversationHandler(
 dispatcher.add_handler(conv_handler)
 
 if __name__ == '__main__':
-    #app.run(debug=True)
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
 
