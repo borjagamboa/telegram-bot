@@ -87,7 +87,7 @@ def generate_content(tema, tone="informativo"):
         return f"Post sobre {tema}", "Error generando contenido. Intenta más tarde."
 
 def publish_to_wordpress(title, content, status='publish'):
-    #api_url = f"{wp_url}/wp-json/wp/v2/posts"
+    api_url = f"{wp_url}/wp-json/wp/v2/posts"
     #api_url = f"https://ausartneuro.es/wp-json/wp/v2/posts"
   
     # Paso 1: Obtener el token JWT
@@ -106,7 +106,7 @@ def publish_to_wordpress(title, content, status='publish'):
         'status': status,
         'content': content
     }
-    r2 = requests.post("https://ausartneuro.es/wp-json/wp/v2/posts", headers=headers, json=post)
+    r2 = requests.post(api_url, headers=headers, json=post)
     
     # Log de la solicitud que estamos enviando
     logger.info(f"Enviando solicitud a WordPress: {api_url}")
