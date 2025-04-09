@@ -1,6 +1,3 @@
-# NOTA: Se han quitado los comandos /tema, /modificar, etc.
-# Todo se maneja con botones ahora.
-
 import json
 import logging
 import os
@@ -51,20 +48,16 @@ def generate_content(tema, tone="informativo"):
     try:
         title_response = openai.ChatCompletion.create(
             model="gpt-4",
-            messages=[
-                {"role": "system", "content": f"Eres un experto en crear títulos atractivos para blogs."},
-                {"role": "user", "content": f"Crea un título para un post sobre: {tema}"}
-            ],
+            messages=[{"role": "system", "content": f"Eres un experto en crear títulos atractivos para blogs."},
+                      {"role": "user", "content": f"Crea un título para un post sobre: {tema}"}],
             max_tokens=50
         )
         title = title_response.choices[0].message.content.strip().replace('"', '')
         content_response = openai.ChatCompletion.create(
-            model="gpt-3.5",
-            messages=[
-                {"role": "system", "content": f"Eres un blogger profesional."},
-                {"role": "user", "content": f"Escribe un artículo de blog sobre {tema} titulado '{title}' en formato HTML y de máximo 700 palabras."}
-            ],
-            max_tokens=700
+            model="gpt-4",
+            messages=[{"role": "system", "content": f"Eres un blogger profesional."},
+                      {"role": "user", "content": f"Escribe un artículo de blog sobre {tema} titulado '{title}' en formato HTML."}],
+            max_tokens=1000
         )
         content = content_response.choices[0].message.content.strip()
         if not content.startswith("<"):
@@ -105,7 +98,7 @@ def handle_message(update, context):
     update.message.reply_text(
         f"📝 <b>Título:</b> {title}\n\n<i>Post generado.</i>",
         parse_mode=telegram.ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup([
+        reply_markup=InlineKeyboardMarkup([  
             [InlineKeyboardButton("Ver contenido", callback_data="ver")],
             [InlineKeyboardButton("Publicar", callback_data="publicar")],
             [InlineKeyboardButton("Guardar borrador", callback_data="guardar")],
@@ -130,7 +123,7 @@ def button_callback(update, context):
         query.edit_message_text(
             f"<b>{post['title']}</b>\n\n{content}",
             parse_mode=telegram.ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([
+            reply_markup=InlineKeyboardMarkup([  
                 [InlineKeyboardButton("Publicar", callback_data="publicar")],
                 [InlineKeyboardButton("Guardar borrador", callback_data="guardar")],
                 [InlineKeyboardButton("Cancelar", callback_data="cancelar")]
