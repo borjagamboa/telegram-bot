@@ -111,13 +111,19 @@ def publish_to_wordpress(title, content, status='publish'):
     else:
         return False, f"Error al publicar: {response.status_code} - {response.text}"
 
-def animate_loading(message, dots_max=3, delay=0.5):
+def show_loading_animation(update, loading_message):
+    """
+    Muestra la animación de puntos suspensivos de uno en uno.
+    """
     dots = 0
-    while True:
-        # Modificar el mensaje con la animación de puntos
-        message.edit_text(f"Generando{'.' * (dots + 1)}")
-        time.sleep(delay)  # Pausa de 0.5 segundos
-        dots = (dots + 1) % dots_max  # Volver al inicio después de 3 puntos
+    loading_text = "Generando"
+    while dots < 3:  # Realiza el ciclo de puntos.
+        loading_message.edit_text(f"{loading_text}{'.' * (dots + 1)}")
+        time.sleep(0.5)  # Pausa de medio segundo
+        dots += 1
+    loading_message.edit_text(f"{loading_text}{'.' * 3}")  # Asegura que se muestren los 3 puntos al final
+    time.sleep(1)
+    loading_message.edit_text(f"{loading_text}. . .")  # Muestra la animación por última vez
 
 def start(update, context):
     update.message.reply_text("¡Hola! ¿Sobre qué tema quieres generar un post?")
@@ -130,19 +136,15 @@ def handle_message(update, context):
     # Enviar el primer mensaje de que está generando el contenido
     loading_message = update.message.reply_text("⏳ Generando contenido...")
 
-    # Ejecutar animación de puntos en un hilo separado
-    context.job_queue.run_repeating(
-        lambda context: animate_loading(loading_message), 
-        interval=1,  # Cada segundo
-        first=0  # Iniciar inmediatamente
-    )
+    # Llamada a la animación de los puntos suspensivos
+    show_loading_animation(update, loading_message)
 
     # Realizar el proceso de generación
     title, content = generate_content(tema)
     user_posts[user_id] = {"title": title, "content": content, "tema": tema}
 
     # Borrar el mensaje de "cargando..." y enviar el contenido generado
-    loading_message.edit_text("Generando... . . .")  # Aquí aparece la animación de puntos
+    loading_message.edit_text("⏳ Generando contenido... . . .")  # Aquí aparece la animación de puntos
 
     # Después de unos segundos, mostrar el contenido
     update.message.reply_text(
@@ -171,14 +173,10 @@ def button_callback(update, context):
 
     if data == "publicar":
         query.edit_message_text("📤 Publicando en WordPress...")
-
-        # Animación mientras se publica el post
-        loading_message = query.edit_message_text("⏳ Publicando...")
-        animate_loading(loading_message)
-
         success, response = publish_to_wordpress(post['title'], post['content'], 'publish')
         if success:
             del user_posts[user_id]
+            # Enviar mensaje confirmando que el post fue publicado
             bot.send_message(chat_id=user_id, text=f"✅ ¡Publicado!\n🔗 {response.get('link')}")
         else:
             send_message_in_chunks(bot, user_id, f"❌ Error al publicar: {response}")
@@ -186,11 +184,6 @@ def button_callback(update, context):
 
     elif data == "rehacer":
         bot.send_message(chat_id=user_id, text="♻️ Rehaciendo propuesta, un momento...")
-
-        # Animación para rehacer la propuesta
-        loading_message = bot.send_message(chat_id=user_id, text="⏳ Rehaciendo propuesta...")
-        animate_loading(loading_message)
-
         title, content = generate_content(post['tema'])
         user_posts[user_id] = {"title": title, "content": content, "tema": post['tema']}
         bot.send_message(
@@ -228,6 +221,10 @@ def handle_sugerencias(update, context):
     )
 
     update.message.reply_text("🛠️ Procesando sugerencias...")
+
+    # Llamar a la animación
+    loading_message = update.message.reply_text("⏳ Procesando sugerencias...")
+    show_loading_animation(update, loading_message)
 
     try:
         response = openai.ChatCompletion.create(
@@ -269,7 +266,6 @@ def handle_sugerencias(update, context):
         return PROPUESTA
 
 
-
 # Configurar dispatcher y handlers globales
 dispatcher = Dispatcher(bot, None, workers=0)
 
@@ -278,31 +274,14 @@ conv_handler = ConversationHandler(
     states={
         TEMA: [MessageHandler(Filters.text & ~Filters.command, handle_message)],
         PROPUESTA: [CallbackQueryHandler(button_callback)],
-        SUGERENCIAS: [MessageHandler(Filters.text & ~Filters.command, handle_sugerencias)],
+        SUGERENCIAS: [MessageHandler(Filters.text & ~Filters.command, handle_sugerencias)]
     },
-    fallbacks=[MessageHandler(Filters.command, start)]
+    fallbacks=[],
 )
 
 dispatcher.add_handler(conv_handler)
 
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    if request.method == "POST":
-        update = telegram.Update.de_json(request.get_json(force=True), bot)
-        dispatcher.process_update(update)
-    return 'ok'
-
-@app.route('/')
-def index():
-    return 'Bot activo con botones!'
-
-@app.route('/set_webhook')
-def set_webhook():
-    url = request.url_root.replace('http://', 'https://')
-    webhook_url = url + 'webhook'
-    success = bot.set_webhook(webhook_url)
-    return f'Webhook {"configurado" if success else "fallido"}: {webhook_url}'
-
 if __name__ == '__main__':
+    #app.run(debug=True)
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
 
