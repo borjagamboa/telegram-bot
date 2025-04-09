@@ -56,7 +56,7 @@ def generate_content(tema, tone="informativo"):
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",  # Usamos gpt-3.5-turbo
             messages=[
-                {"role": "system", "content": "Eres un asistente experto en generación de contenido. Genera un título atractivo y un contenido para un blog en formato JSON."},
+                {"role": "system", "content": "Eres un asistente experto en generación de contenido y en neurorrehabilitación. Genera un título atractivo y un contenido para un blog en formato JSON."},
                 {"role": "user", "content": f"Genera un título atractivo y un artículo de blog sobre: {tema}. Devuélvelo en json usando los tags title y content. Máximo 700 palabras. No añadas comentarios"}
             ]
         )
@@ -88,18 +88,25 @@ def generate_content(tema, tone="informativo"):
 
 def publish_to_wordpress(title, content, status='publish'):
     #api_url = f"{wp_url}/wp-json/wp/v2/posts"
-    api_url = f"https://ausartneuro.es/wp-json/wp/v2/posts"
-    credentials = f"{wp_user}:{wp_password}"
-    token = base64.b64encode(credentials.encode())
+    #api_url = f"https://ausartneuro.es/wp-json/wp/v2/posts"
+  
+    # Paso 1: Obtener el token JWT
+    r = requests.post(f"{wp_url}/wp-json/jwt-auth/v1/token", data={
+    'username': wp_user,
+    'password': wp_password
+    })
+    token = r.json()['token']
+
+    # Paso 2: Crear el post
     headers = {
-        'Authorization': f'Basic {token.decode("utf-8")}',
-        'Content-Type': 'application/json'
+        'Authorization': f'Bearer {token}'
     }
-    post_data = {
-        'title': title, 
-        'content': content, 
-        'status': status
+    post = {
+        'title': title,
+        'status': status,
+        'content': content
     }
+    r2 = requests.post("https://ausartneuro.es/wp-json/wp/v2/posts", headers=headers, json=post)
     
     # Log de la solicitud que estamos enviando
     logger.info(f"Enviando solicitud a WordPress: {api_url}")
