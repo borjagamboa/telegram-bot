@@ -9,6 +9,7 @@ import requests
 from google.cloud import secretmanager
 import base64
 import openai
+import re
 
 # Configuración de logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -44,31 +45,41 @@ telegram_token, wp_url, wp_user, wp_password, openai_api_key = get_config()
 bot = telegram.Bot(token=telegram_token)
 openai.api_key = openai_api_key
 
+# Limpiar contenido HTML para evitar problemas con Telegram
+def clean_html(content):
+    clean = re.compile("<.*?>")
+    return re.sub(clean, "", content)
+
 def generate_content(tema, tone="informativo"):
     try:
-        title_response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "system", "content": f"Eres un experto en crear títulos atractivos para blogs."},
-                      {"role": "user", "content": f"Crea un título para un post sobre: {tema}"}],
+        # Usar la versión anterior de OpenAI
+        title_response = openai.Completion.create(
+            model="text-davinci-003",  # Cambié a text-davinci-003
+            prompt=f"Genera un título atractivo para un post sobre: {tema}",
             max_tokens=50
         )
-        title = title_response.choices[0].message.content.strip().replace('"', '')
-        content_response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "system", "content": f"Eres un blogger profesional."},
-                      {"role": "user", "content": f"Escribe un artículo de blog sobre {tema} titulado '{title}' en formato HTML."}],
+        title = title_response.choices[0].text.strip()
+        content_response = openai.Completion.create(
+            model="text-davinci-003",  # Cambié a text-davinci-003
+            prompt=f"Escribe un artículo de blog sobre {tema} titulado '{title}' en formato HTML.",
             max_tokens=1000
         )
-        content = content_response.choices[0].message.content.strip()
-        if not content.startswith("<"):
-            content = "<p>" + content.replace('\n\n', '</p><p>').replace('\n', '<br>') + "</p>"
+        content = content_response.choices[0].text.strip()
+        
+        # Limpiar el contenido de cualquier HTML no permitido
+        content = clean_html(content)
+        
+        if not content:
+            content = "<p>No se pudo generar contenido. Intenta más tarde.</p>"
+        
         return title, content
     except Exception as e:
         logger.error(f"Error generando contenido: {e}")
-        return f"Post sobre {tema}", f"<p>Error generando contenido. Intenta más tarde.</p>"
+        return f"Post sobre {tema}", "<p>Error generando contenido. Intenta más tarde.</p>"
 
 def publish_to_wordpress(title, content, status='draft'):
-    api_url = f"{wp_url}/wp-json/wp/v2/posts"
+    #api_url = f"{wp_url}/wp-json/wp/v2/posts"
+    api_url = 'https://www.ausartneuro.es/wp-json/wp/v2/posts'
     credentials = f"{wp_user}:{wp_password}"
     token = base64.b64encode(credentials.encode())
     headers = {
@@ -98,7 +109,7 @@ def handle_message(update, context):
     update.message.reply_text(
         f"📝 <b>Título:</b> {title}\n\n<i>Post generado.</i>",
         parse_mode=telegram.ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup([  
+        reply_markup=InlineKeyboardMarkup([  # Aquí está el error de no ver el contenido
             [InlineKeyboardButton("Ver contenido", callback_data="ver")],
             [InlineKeyboardButton("Publicar", callback_data="publicar")],
             [InlineKeyboardButton("Guardar borrador", callback_data="guardar")],
@@ -123,7 +134,7 @@ def button_callback(update, context):
         query.edit_message_text(
             f"<b>{post['title']}</b>\n\n{content}",
             parse_mode=telegram.ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([  
+            reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("Publicar", callback_data="publicar")],
                 [InlineKeyboardButton("Guardar borrador", callback_data="guardar")],
                 [InlineKeyboardButton("Cancelar", callback_data="cancelar")]
