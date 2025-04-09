@@ -252,7 +252,7 @@ def modificar_command(update, context):
         
         # Asegurarnos de que el contenido esté en formato HTML
         if not new_content.startswith("<"):
-            new_content = f"<p>{new_content.replace('\n\n', '</p><p>').replace('\n', '<br>')}</p>"
+            new_content = "<p>" + new_content.replace('\n\n', '</p><p>').replace('\n', '<br>') + "</p>"
         
         # Actualizar el post
         user_posts[user_id]['title'] = new_title
@@ -357,7 +357,7 @@ def button_callback(update, context):
         
         post = user_posts[user_id]
         content_preview = post['content'][:300] + '...' if len(post['content']) > 300 else post['content']
-        content_preview = content_preview.replace('<p>', '').replace('</p>', '\n\n').replace('<br>', '\n')
+        content_preview = "<p>" + content_preview.replace('\n\n', '</p><p>').replace('\n', '<br>') + "</p>"
         
         query.edit_message_text(
             f"📝 <b>Título:</b> {post['title']}\n\n"
