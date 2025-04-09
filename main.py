@@ -3,11 +3,13 @@ import logging
 import os
 from flask import Flask, request
 import telegram
-from telegram.ext import Dispatcher, MessageHandler, Filters, CallbackContext
+from telegram.ext import (
+    Dispatcher, MessageHandler, Filters, CallbackContext,
+    ConversationHandler, CallbackQueryHandler
+)
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 import requests
 from google.cloud import secretmanager
-import base64
 import openai
 import re
 
@@ -18,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 user_posts = {}
+
+# Estados para ConversationHandler
+TEMA, PROPUESTA = range(2)
 
 def access_secret(secret_id):
     client = secretmanager.SecretManagerServiceClient()
@@ -45,26 +50,20 @@ telegram_token, wp_url, wp_user, wp_password, openai_api_key = get_config()
 bot = telegram.Bot(token=telegram_token)
 openai.api_key = openai_api_key
 
-# Limpiar contenido HTML para evitar problemas con Telegram
 def clean_html(content):
     clean = re.compile("<.*?>")
     return re.sub(clean, "", content)
 
 def generate_content(tema, tone="informativo"):
     try:
-        # Usar gpt-3.5-turbo para generar título y contenido
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # Usamos gpt-3.5-turbo
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "Eres un asistente experto en generación de contenido y en neurorrehabilitación. Genera un título atractivo y un contenido para un blog en formato JSON."},
                 {"role": "user", "content": f"Genera un título atractivo y un artículo de blog sobre: {tema}. Devuélvelo en json usando los tags title y content. Máximo 700 palabras. No añadas comentarios"}
             ]
         )
-        
-        # Obtener la respuesta de OpenAI y extraer el JSON
         response_content = response['choices'][0]['message']['content'].strip()
-        
-        # Intentar cargar la respuesta como JSON
         try:
             post_data = json.loads(response_content)
             title = post_data.get("title", "Título no encontrado")
@@ -73,31 +72,25 @@ def generate_content(tema, tone="informativo"):
             logger.error(f"Error al decodificar la respuesta JSON: {response}")
             title = "Error generando título"
             content = "Error generando contenido."
-        
-        # Limpiar el contenido de cualquier HTML no permitido
+
         content = clean_html(content)
-        
+
         if not content:
             content = "No se pudo generar contenido. Intenta más tarde."
-        
+
         return title, content
-    
+
     except Exception as e:
         logger.error(f"Error generando contenido: {e}")
         return f"Post sobre {tema}", "Error generando contenido. Intenta más tarde."
 
 def publish_to_wordpress(title, content, status='publish'):
     api_url = f"{wp_url}/wp-json/wp/v2/posts"
-    #api_url = f"https://ausartneuro.es/wp-json/wp/v2/posts"
-  
-    # Paso 1: Obtener el token JWT
     r = requests.post(f"{wp_url}/wp-json/jwt-auth/v1/token", data={
-    'username': wp_user,
-    'password': wp_password
+        'username': wp_user,
+        'password': wp_password
     })
     token = r.json()['token']
-
-    # Paso 2: Crear el post
     headers = {
         'Authorization': f'Bearer {token}'
     }
@@ -106,54 +99,42 @@ def publish_to_wordpress(title, content, status='publish'):
         'status': status,
         'content': content
     }
-    r2 = requests.post(api_url, headers=headers, json=post)
-    
-    # Log de la solicitud que estamos enviando
+    response = requests.post(api_url, headers=headers, json=post)
     logger.info(f"Enviando solicitud a WordPress: {api_url}")
-    logger.info(f"Datos del post: {post_data}")
-    
-    # Hacer la solicitud POST a WordPress
-    response = requests.post(api_url, headers=headers, json=post_data)
-    
-    # Log de la respuesta completa para depuración
+    logger.info(f"Datos del post: {post}")
     logger.info(f"Respuesta de WordPress: {response.status_code}")
-    logger.info(f"Contenido de la respuesta: {response.json()}")  # Cambié esto a json() para obtener el contenido completo
-    
+    logger.info(f"Contenido de la respuesta: {response.json()}")
+
     if response.status_code == 201:
-        return True, response.json()  # Devuelve el post creado con éxito
+        return True, response.json()
     else:
-        # Si la respuesta no es exitosa, logueamos el error
         return False, f"Error al publicar: {response.status_code} - {response.text}"
 
-
-# Comienzo con botón
 def start(update, context):
-    update.message.reply_text(
-        "¡Hola! ¿Sobre qué tema quieres generar un post?",
-        reply_markup=telegram.ForceReply(selective=True)
-    )
+    update.message.reply_text("¡Hola! ¿Sobre qué tema quieres generar un post?")
+    return TEMA
 
-# Captura del tema desde texto libre (después de botón Start)
 def handle_message(update, context):
     user_id = update.effective_user.id
     tema = update.message.text.strip()
-    update.message.reply_text(f"Generando contenido para: {tema}")
+    update.message.reply_text(f"Generando contenido para: {tema}...")
     title, content = generate_content(tema)
     user_posts[user_id] = {"title": title, "content": content, "tema": tema}
+
     update.message.reply_text(
         f"📝 <b>Título:</b> {title}\n\n{content}",
         parse_mode=telegram.ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup([  # Eliminado "Ver contenido"
-            [InlineKeyboardButton("Publicar", callback_data="publicar")],
-            [InlineKeyboardButton("Guardar borrador", callback_data="guardar")],
-            [InlineKeyboardButton("Cancelar", callback_data="cancelar")]
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
+            [InlineKeyboardButton("✏️ Sugerir cambios", callback_data="cambios")],
+            [InlineKeyboardButton("🆕 Cambiar tema", callback_data="cambiar")],
+            [InlineKeyboardButton("✅ Publicar", callback_data="publicar")]
         ])
     )
+    return PROPUESTA
 
 def send_message_in_chunks(bot, chat_id, text):
-    """Envía el mensaje en fragmentos si es demasiado largo."""
-    max_length = 4096  # El límite de Telegram para un solo mensaje.
-    # Dividir el contenido en trozos más pequeños si es necesario.
+    max_length = 4096
     for i in range(0, len(text), max_length):
         bot.send_message(chat_id, text[i:i + max_length])
 
@@ -165,41 +146,101 @@ def button_callback(update, context):
 
     if user_id not in user_posts:
         query.edit_message_text("No hay ningún post en progreso.")
-        return
+        return ConversationHandler.END
 
     post = user_posts[user_id]
 
     if data == "publicar":
-        query.edit_message_text("Publicando en WordPress...")  # Mensaje mientras se publica
-        success, response = publish_to_wordpress(post['title'], post['content'], 'publish')  # Publicamos el post
-
-        if success:
-            del user_posts[user_id]  # Limpiamos el post después de publicarlo
-            send_message_in_chunks(bot, user_id, f"✅ ¡Publicado!\n🔗 {response.get('link')}")  # Enviamos el enlace del post publicado
-        else:
-            send_message_in_chunks(bot, user_id, f"❌ Error al publicar: {response}")  # En caso de error, enviamos el mensaje de error
-
-    elif data == "guardar":
-        query.edit_message_text("Guardando como borrador...")
-        success, response = publish_to_wordpress(post['title'], post['content'], 'draft')
+        query.edit_message_text("Publicando en WordPress...")
+        success, response = publish_to_wordpress(post['title'], post['content'], 'publish')
         if success:
             del user_posts[user_id]
-            query.edit_message_text(f"📝 Borrador guardado. ID: {response.get('id')}")
+            send_message_in_chunks(bot, user_id, f"✅ ¡Publicado!\n🔗 {response.get('link')}")
         else:
-            query.edit_message_text(f"❌ Error: {response}")
+            send_message_in_chunks(bot, user_id, f"❌ Error al publicar: {response}")
+        return ConversationHandler.END
 
-    elif data == "cancelar":
+    elif data == "rehacer":
+        title, content = generate_content(post['tema'])
+        user_posts[user_id] = {"title": title, "content": content, "tema": post['tema']}
+        query.edit_message_text(
+            f"🔁 <b>Título:</b> {title}\n\n{content}",
+            parse_mode=telegram.ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
+                [InlineKeyboardButton("✏️ Sugerir cambios", callback_data="cambios")],
+                [InlineKeyboardButton("🆕 Cambiar tema", callback_data="cambiar")],
+                [InlineKeyboardButton("✅ Publicar", callback_data="publicar")]
+            ])
+        )
+        return PROPUESTA
+
+    elif data == "cambiar":
         del user_posts[user_id]
-        query.edit_message_text("❌ Post cancelado. Puedes comenzar uno nuevo enviando otro tema.")
+        bot.send_message(chat_id=user_id, text="🆕 ¿Cuál es el nuevo tema?")
+        return TEMA
+
+    elif data == "cambios":
+        bot.send_message(chat_id=user_id, text="✏️ Escribe tus sugerencias o cambios:")
+        return "SUGERENCIAS"
+
+def handle_sugerencias(update, context):
+    user_id = update.effective_user.id
+    sugerencias = update.message.text.strip()
+    tema_original = user_posts[user_id]['tema']
+    prompt = f"A partir del tema '{tema_original}', genera una nueva propuesta tomando en cuenta estas sugerencias: {sugerencias}. Devuelve un JSON con 'title' y 'content'."
+
+    update.message.reply_text("✏️ Generando nueva propuesta con tus sugerencias...")
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Eres un asistente experto en contenido de blog. Devuelve el resultado en JSON."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        content = response['choices'][0]['message']['content']
+        post_data = json.loads(content)
+        title = post_data.get("title", "Título")
+        content = clean_html(post_data.get("content", "Contenido"))
+
+        user_posts[user_id] = {"title": title, "content": content, "tema": tema_original}
+
+        update.message.reply_text(
+            f"📝 <b>Título:</b> {title}\n\n{content}",
+            parse_mode=telegram.ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
+                [InlineKeyboardButton("✏️ Sugerir cambios", callback_data="cambios")],
+                [InlineKeyboardButton("🆕 Cambiar tema", callback_data="cambiar")],
+                [InlineKeyboardButton("✅ Publicar", callback_data="publicar")]
+            ])
+        )
+        return PROPUESTA
+
+    except Exception as e:
+        logger.error(f"Error en sugerencias: {e}")
+        update.message.reply_text("⚠️ Ocurrió un error al procesar tus sugerencias. Inténtalo de nuevo.")
+        return PROPUESTA
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
     if request.method == "POST":
         update = telegram.Update.de_json(request.get_json(force=True), bot)
         dispatcher = Dispatcher(bot, None, workers=0)
-        dispatcher.add_handler(MessageHandler(Filters.reply, handle_message))
-        dispatcher.add_handler(MessageHandler(Filters.command, start))  # Solo comando /start
-        dispatcher.add_handler(telegram.ext.CallbackQueryHandler(button_callback))
+
+        conv_handler = ConversationHandler(
+            entry_points=[MessageHandler(Filters.command, start)],
+            states={
+                TEMA: [MessageHandler(Filters.text & ~Filters.command, handle_message)],
+                PROPUESTA: [CallbackQueryHandler(button_callback)],
+                "SUGERENCIAS": [MessageHandler(Filters.text & ~Filters.command, handle_sugerencias)],
+            },
+            fallbacks=[MessageHandler(Filters.command, start)]
+        )
+
+        dispatcher.add_handler(conv_handler)
         dispatcher.process_update(update)
     return 'ok'
 
