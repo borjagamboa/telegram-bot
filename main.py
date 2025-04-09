@@ -87,7 +87,7 @@ def generate_content(tema, tone="informativo"):
         
         # Asegurarnos de que el contenido esté en formato HTML
         if not content.startswith("<"):
-            content = f"<p>{content.replace('\n\n', '</p><p>').replace('\n', '<br>')}</p>"
+            content = "<p>" + content.replace('\n\n', '</p><p>').replace('\n', '<br>') + "</p>"
         
         return title, content
     
