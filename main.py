@@ -117,76 +117,6 @@ def start(update, context):
 def handle_message(update, context):
     user_id = update.effective_user.id
     tema = update.message.text.strip()
-    update.message.reply_text(f"Generando contenido para: {tema}...")
-    title, content = generate_content(tema)
-    user_posts[user_id] = {"title": title, "content": content, "tema": tema}
-
-    update.message.reply_text(
-        f"📝 <b>Título:</b> {title}\n\n{content}",
-        parse_mode=telegram.ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
-            [InlineKeyboardButton("✏️ Sugerir cambios", callback_data="cambios")],
-            [InlineKeyboardButton("🆕 Cambiar tema", callback_data="cambiar")],
-            [InlineKeyboardButton("✅ Publicar", callback_data="publicar")]
-        ])
-    )
-    return PROPUESTA
-
-def send_message_in_chunks(bot, chat_id, text):
-    max_length = 4096
-    for i in range(0, len(text), max_length):
-        bot.send_message(chat_id, text[i:i + max_length])
-
-def button_callback(update, context):
-    query = update.callback_query
-    query.answer()
-    user_id = query.from_user.id
-    data = query.data
-
-    if user_id not in user_posts:
-        query.edit_message_text("No hay ningún post en progreso.")
-        return ConversationHandler.END
-
-    post = user_posts[user_id]
-
-    if data == "publicar":
-        query.edit_message_text("Publicando en WordPress...")
-        success, response = publish_to_wordpress(post['title'], post['content'], 'publish')
-        if success:
-            del user_posts[user_id]
-            send_message_in_chunks(bot, user_id, f"✅ ¡Publicado!\n🔗 {response.get('link')}")
-        else:
-            send_message_in_chunks(bot, user_id, f"❌ Error al publicar: {response}")
-        return ConversationHandler.END
-
-    elif data == "rehacer":
-        title, content = generate_content(post['tema'])
-        user_posts[user_id] = {"title": title, "content": content, "tema": post['tema']}
-        query.edit_message_text(
-            f"🔁 <b>Título:</b> {title}\n\n{content}",
-            parse_mode=telegram.ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
-                [InlineKeyboardButton("✏️ Sugerir cambios", callback_data="cambios")],
-                [InlineKeyboardButton("🆕 Cambiar tema", callback_data="cambiar")],
-                [InlineKeyboardButton("✅ Publicar", callback_data="publicar")]
-            ])
-        )
-        return PROPUESTA
-
-    elif data == "cambiar":
-        del user_posts[user_id]
-        bot.send_message(chat_id=user_id, text="🆕 ¿Cuál es el nuevo tema?")
-        return TEMA
-
-    elif data == "cambios":
-        bot.send_message(chat_id=user_id, text="✏️ Escribe tus sugerencias para mejorar la propuesta actual:")
-        return SUGERENCIAS
-
-def handle_message(update, context):
-    user_id = update.effective_user.id
-    tema = update.message.text.strip()
     
     update.message.reply_text("⏳ Generando contenido...")
 
@@ -305,3 +235,40 @@ def handle_sugerencias(update, context):
         logger.error(f"Error en sugerencias: {e}")
         update.message.reply_text("⚠️ Ocurrió un error al procesar tus sugerencias. Inténtalo de nuevo.")
         return PROPUESTA
+
+
+# Configurar dispatcher y handlers globales
+dispatcher = Dispatcher(bot, None, workers=0)
+
+conv_handler = ConversationHandler(
+    entry_points=[MessageHandler(Filters.command, start)],
+    states={
+        TEMA: [MessageHandler(Filters.text & ~Filters.command, handle_message)],
+        PROPUESTA: [CallbackQueryHandler(button_callback)],
+        SUGERENCIAS: [MessageHandler(Filters.text & ~Filters.command, handle_sugerencias)],
+    },
+    fallbacks=[MessageHandler(Filters.command, start)]
+)
+
+dispatcher.add_handler(conv_handler)
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    if request.method == "POST":
+        update = telegram.Update.de_json(request.get_json(force=True), bot)
+        dispatcher.process_update(update)
+    return 'ok'
+
+@app.route('/')
+def index():
+    return 'Bot activo con botones!'
+
+@app.route('/set_webhook')
+def set_webhook():
+    url = request.url_root.replace('http://', 'https://')
+    webhook_url = url + 'webhook'
+    success = bot.set_webhook(webhook_url)
+    return f'Webhook {"configurado" if success else "fallido"}: {webhook_url}'
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
