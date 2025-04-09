@@ -57,7 +57,7 @@ def generate_content(tema, tone="informativo"):
             model="gpt-3.5-turbo",  # Usamos gpt-3.5-turbo
             messages=[
                 {"role": "system", "content": "Eres un asistente experto en generación de contenido. Genera un título atractivo y un contenido para un blog en formato JSON."},
-                {"role": "user", "content": f"Genera un título atractivo y un artículo de blog sobre: {tema}"}
+                {"role": "user", "content": f"Genera un título atractivo y un artículo de blog sobre: {tema}. Devuélvelo en json y usa los tags title y content. Máximo 700 palabras. No añadas comentarios"}
             ]
         )
         
