@@ -52,7 +52,7 @@ def clean_html(content):
 
 def generate_content(tema, tone="informativo"):
     try:
-        # Usar gpt-3.5-turbo para generar título y contenido en formato JSON
+        # Usar gpt-3.5-turbo para generar título y contenido
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",  # Usamos gpt-3.5-turbo
             messages=[
@@ -129,13 +129,14 @@ def handle_message(update, context):
             [InlineKeyboardButton("Cancelar", callback_data="cancelar")]
         ])
     )
+
 def send_message_in_chunks(bot, chat_id, text):
     """Envía el mensaje en fragmentos si es demasiado largo."""
     max_length = 4096  # El límite de Telegram para un solo mensaje.
     # Dividir el contenido en trozos más pequeños si es necesario.
     for i in range(0, len(text), max_length):
         bot.send_message(chat_id, text[i:i + max_length])
-      
+
 def button_callback(update, context):
     query = update.callback_query
     query.answer()
