@@ -52,19 +52,27 @@ def clean_html(content):
 
 def generate_content(tema, tone="informativo"):
     try:
-        # Usar la versión más reciente de OpenAI
-        title_response = openai.Completion.create(
-            model="gpt-4",  # Cambié a gpt-4 (más actualizado)
-            prompt=f"Genera un título atractivo para un post sobre: {tema}",
-            max_tokens=50
+        # Usar gpt-3.5-turbo para generar título y contenido en formato JSON
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",  # Usamos gpt-3.5-turbo
+            messages=[
+                {"role": "system", "content": "Eres un asistente experto en generación de contenido. Genera un título atractivo y un contenido para un blog en formato JSON."},
+                {"role": "user", "content": f"Genera un título atractivo y un artículo de blog sobre: {tema}"}
+            ]
         )
-        title = title_response.choices[0].text.strip()
-        content_response = openai.Completion.create(
-            model="gpt-4",  # Cambié a gpt-4 (más actualizado)
-            prompt=f"Escribe un artículo de blog sobre {tema} titulado '{title}' en formato HTML.",
-            max_tokens=1000
-        )
-        content = content_response.choices[0].text.strip()
+        
+        # Obtener la respuesta de OpenAI y extraer el JSON
+        response_content = response['choices'][0]['message']['content'].strip()
+        
+        # Intentar cargar la respuesta como JSON
+        try:
+            post_data = json.loads(response_content)
+            title = post_data.get("title", "Título no encontrado")
+            content = post_data.get("content", "Contenido no encontrado")
+        except json.JSONDecodeError:
+            logger.error("Error al decodificar la respuesta JSON.")
+            title = "Error generando título"
+            content = "Error generando contenido."
         
         # Limpiar el contenido de cualquier HTML no permitido
         content = clean_html(content)
@@ -73,6 +81,7 @@ def generate_content(tema, tone="informativo"):
             content = "No se pudo generar contenido. Intenta más tarde."
         
         return title, content
+    
     except Exception as e:
         logger.error(f"Error generando contenido: {e}")
         return f"Post sobre {tema}", "Error generando contenido. Intenta más tarde."
