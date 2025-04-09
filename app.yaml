@@ -1,5 +1,8 @@
 runtime: python39
 entrypoint: gunicorn -b :$PORT main:app
 
+env_variables:
+  PROJECT_ID: "tu-proyecto-id-en-gcp"  # Reemplaza esto con tu ID de proyecto real
+
 # Configuración de Secret Manager (recomendado para producción)
 service_account: "bot-test-2-455806@appspot.gserviceaccount.com"
