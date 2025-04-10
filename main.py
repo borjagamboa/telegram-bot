@@ -115,6 +115,7 @@ def start(update, context):
     )
     return SELECCION_MODELO
 
+# Aquí definimos la función `handle_model_selection` antes de que se use en el ConversationHandler
 def handle_model_selection(update, context):
     user_id = update.effective_user.id
     selected_model = update.message.text.strip()
@@ -298,4 +299,5 @@ dispatcher.add_handler(conv_handler)
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
 
