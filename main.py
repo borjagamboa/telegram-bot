@@ -156,7 +156,7 @@ def handle_message(update, context):
     tema = update.message.text.strip()
     loading_message = update.message.reply_text("⏳ Generando.")
     stop_flag = animated_loading(loading_message, base_text="Generando")
-    title, content = generate_content(tema)
+    title, content = generate_content(tema, openai_model)
     user_posts[user_id] = {"title": title, "content": content, "tema": tema}
     stop_flag.set()
 
@@ -198,7 +198,7 @@ def button_callback(update, context):
     elif data == "rehacer":
         msg = bot.send_message(chat_id=user_id, text="♻️ Rehaciendo propuesta...")
         stop_flag = animated_loading(msg, base_text="Generando")
-        title, content = generate_content(post['tema'])
+        title, content = generate_content(post['tema'], openai_model)
         user_posts[user_id] = {"title": title, "content": content, "tema": post['tema']}
         stop_flag.set()
         bot.send_message(
@@ -241,17 +241,16 @@ def handle_sugerencias(update, context):
         if model == "gpt-3.5-turbo-instruct":
             # Usamos el endpoint completions para el modelo instruct
             response = openai.Completion.create(
-                model=model,
-                prompt,
+                model=openai_model,
+                prompt=prompt,
                 max_tokens=700,
                 n=1,
                 stop=None,
-                temperature=0.7
-            )
+                temperature=0.7)
         else:
             # Usamos el modelo chat (gpt-3.5-turbo por defecto)
             response = openai.ChatCompletion.create(
-                model=model,
+                model=openai_model,
                 messages=[ 
                     {"role": "system", "content": "Eres un asistente experto en generación de contenido y en neurorrehabilitación. Genera un título atractivo y un contenido para un blog en formato JSON."},
                     {"role": "user", "content": promp}
