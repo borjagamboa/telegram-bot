@@ -247,6 +247,7 @@ def handle_sugerencias(update, context):
                 n=1,
                 stop=None,
                 temperature=0.7)
+            response_content = response.choices[0].text.strip()
         else:
             # Usamos el modelo chat (gpt-3.5-turbo por defecto)
             response = openai.ChatCompletion.create(
@@ -254,17 +255,24 @@ def handle_sugerencias(update, context):
                 messages=[ 
                     {"role": "system", "content": "Eres un asistente experto en generación de contenido y en neurorrehabilitación. Genera un título atractivo y un contenido para un blog en formato JSON."},
                     {"role": "user", "content": promp}
-                ]
-            )
+                ])
+            response_content = response['choices'][0]['message']['content'].strip()
 
-        result = response['choices'][0]['message']['content'].strip()
-        post_data = json.loads(result)
-        title = post_data.get("title", tema_original)
-        nuevo_content = clean_html(post_data.get("content", contenido_actual))
+        try:
+            post_data = json.loads(response_content)
+            title = post_data.get("title", "Título no encontrado")
+            content = post_data.get("content", contenido_actual)
+        except json.JSONDecodeError:
+            logger.error(f"Error al decodificar la respuesta JSON: {response_content}")
+            title = "Error generando título"
+            content = "Error generando contenido."
+        nuevo_content = clean_html(content)
+        if not content:
+            content = "No se pudo generar contenido. Intenta más tarde."
         highlighted = diff_highlight(contenido_actual, nuevo_content)
         user_posts[user_id] = {"title": title, "content": nuevo_content, "tema": tema_original}
         stop_flag.set()
-
+        
         update.message.reply_text(
             f"📝 <b>{title}</b>\n\n{highlighted}",
             parse_mode=telegram.ParseMode.HTML,
@@ -279,7 +287,7 @@ def handle_sugerencias(update, context):
 
     except Exception as e:
         stop_flag.set()
-        logger.error(f"Error en sugerencias: {e}")
+        logger.error(f"Error en sugerencias: {e}. Respuesta: ")
         update.message.reply_text("⚠️ Ocurrió un error al procesar tus sugerencias. Inténtalo de nuevo.")
         return PROPUESTA
 
