@@ -13,6 +13,7 @@ from google.cloud import secretmanager
 import openai
 import re
 import time
+import threading
 
 # Configuración de logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -75,10 +76,8 @@ def generate_content(tema, tone="informativo"):
             content = "Error generando contenido."
 
         content = clean_html(content)
-
         if not content:
             content = "No se pudo generar contenido. Intenta más tarde."
-
         return title, content
 
     except Exception as e:
@@ -101,11 +100,6 @@ def publish_to_wordpress(title, content, status='publish'):
         'content': content
     }
     response = requests.post(api_url, headers=headers, json=post)
-    logger.info(f"Enviando solicitud a WordPress: {api_url}")
-    logger.info(f"Datos del post: {post}")
-    logger.info(f"Respuesta de WordPress: {response.status_code}")
-    logger.info(f"Contenido de la respuesta: {response.json()}")
-
     if response.status_code == 201:
         return True, response.json()
     else:
@@ -115,28 +109,38 @@ def start(update, context):
     update.message.reply_text("¡Hola! ¿Sobre qué tema quieres generar un post?")
     return TEMA
 
+def animated_loading(message):
+    stop_flag = threading.Event()
+
+    def animate():
+        states = ["⏳ Generando.", "⏳ Generando..", "⏳ Generando..."]
+        i = 0
+        while not stop_flag.is_set():
+            try:
+                message.edit_text(states[i % len(states)])
+                time.sleep(0.6)
+                i += 1
+            except Exception:
+                break
+
+    thread = threading.Thread(target=animate)
+    thread.start()
+    return stop_flag
+
 def handle_message(update, context):
     user_id = update.effective_user.id
     tema = update.message.text.strip()
+    loading_message = update.message.reply_text("⏳ Generando.")
 
-    # Enviar el primer mensaje de que está generando el contenido
-    loading_message = update.message.reply_text("⏳ Generando contenido...")
+    # Animación
+    stop_flag = animated_loading(loading_message)
 
-    # Animación de puntos, que se actualizará cada 0.5 segundos
-    dots = 0
-    while dots < 3:  # Hacerlo por 3 ciclos (aparecerán 3 puntos)
-        loading_message.edit_text(f"⏳ Generando contenido...{'.' * (dots + 1)}")
-        time.sleep(0.5)  # Pausa de 0.5 segundos
-        dots += 1
-
-    # Realizar el proceso de generación
+    # Generar contenido
     title, content = generate_content(tema)
     user_posts[user_id] = {"title": title, "content": content, "tema": tema}
 
-    # Borrar el mensaje de "cargando..." y enviar el contenido generado
-    loading_message.edit_text("⏳ Generando contenido... . . .")  # Aquí aparece la animación de puntos
+    stop_flag.set()
 
-    # Después de unos segundos, mostrar el contenido
     update.message.reply_text(
         f"📝 <b>Título:</b> {title}\n\n{content}",
         parse_mode=telegram.ParseMode.HTML,
@@ -166,16 +170,19 @@ def button_callback(update, context):
         success, response = publish_to_wordpress(post['title'], post['content'], 'publish')
         if success:
             del user_posts[user_id]
-            # Enviar mensaje confirmando que el post fue publicado
             bot.send_message(chat_id=user_id, text=f"✅ ¡Publicado!\n🔗 {response.get('link')}")
         else:
-            send_message_in_chunks(bot, user_id, f"❌ Error al publicar: {response}")
+            bot.send_message(chat_id=user_id, text=f"❌ Error al publicar: {response}")
         return ConversationHandler.END
 
     elif data == "rehacer":
-        bot.send_message(chat_id=user_id, text="♻️ Rehaciendo propuesta, un momento...")
+        msg = bot.send_message(chat_id=user_id, text="♻️ Rehaciendo propuesta...")
+        stop_flag = animated_loading(msg)
+
         title, content = generate_content(post['tema'])
         user_posts[user_id] = {"title": title, "content": content, "tema": post['tema']}
+        stop_flag.set()
+
         bot.send_message(
             chat_id=user_id,
             text=f"🔁 <b>Título:</b> {title}\n\n{content}",
@@ -210,7 +217,8 @@ def handle_sugerencias(update, context):
         "Realiza una versión mejorada teniendo en cuenta las sugerencias. Devuelve un JSON con 'title' y 'content'."
     )
 
-    update.message.reply_text("🛠️ Procesando sugerencias...")
+    msg = update.message.reply_text("🛠️ Aplicando sugerencias...")
+    stop_flag = animated_loading(msg)
 
     try:
         response = openai.ChatCompletion.create(
@@ -222,17 +230,18 @@ def handle_sugerencias(update, context):
         )
         content = response['choices'][0]['message']['content'].strip()
 
-        # Validar que el contenido es JSON antes de parsear
         try:
             post_data = json.loads(content)
             title = post_data.get("title", "Título")
             content = clean_html(post_data.get("content", "Contenido"))
         except json.JSONDecodeError:
+            stop_flag.set()
             logger.error(f"Respuesta no es JSON válida: {content}")
             update.message.reply_text("⚠️ La respuesta del modelo no es válida. Intenta nuevamente.")
             return PROPUESTA
 
         user_posts[user_id] = {"title": title, "content": content, "tema": tema_original}
+        stop_flag.set()
 
         update.message.reply_text(
             f"📝 <b>Título:</b> {title}\n\n{content}",
@@ -247,6 +256,7 @@ def handle_sugerencias(update, context):
         return PROPUESTA
 
     except Exception as e:
+        stop_flag.set()
         logger.error(f"Error en sugerencias: {e}")
         update.message.reply_text("⚠️ Ocurrió un error al procesar tus sugerencias. Inténtalo de nuevo.")
         return PROPUESTA
@@ -287,3 +297,4 @@ def set_webhook():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+
