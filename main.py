@@ -14,6 +14,7 @@ import openai
 import re
 import time
 import threading
+import difflib
 
 # Configuración de logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -61,23 +62,21 @@ def generate_content(tema, tone="informativo"):
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "Eres un asistente experto en generación de contenido y en neurorrehabilitación. Genera un título atractivo y un contenido para un blog en formato JSON."},
-                {"role": "user", "content": f"Genera un título atractivo y un artículo de blog sobre: {tema}. Devuélvelo en json usando los tags title y content. Máximo 700 palabras. No añadas comentarios"}
+                {"role": "system", "content": "Eres un asistente experto en generación de contenido de blog y en neurorrehabilitación. Devuelve solo un JSON con 'title' y 'content'."},
+                {"role": "user", "content": f"Genera un título atractivo con un emoji al inicio y un artículo de blog sobre: {tema}. Devuélvelo en JSON usando los tags title y content. Máximo 700 palabras."}
             ]
         )
-        response_content = response['choices'][0]['message']['content'].strip()
+        content = response['choices'][0]['message']['content'].strip()
         try:
-            post_data = json.loads(response_content)
+            post_data = json.loads(content)
             title = post_data.get("title", "Título no encontrado")
             content = post_data.get("content", "Contenido no encontrado")
         except json.JSONDecodeError:
-            logger.error(f"Error al decodificar la respuesta JSON: {response}")
+            logger.error(f"Error al decodificar JSON: {content}")
             title = "Error generando título"
             content = "Error generando contenido."
 
         content = clean_html(content)
-        if not content:
-            content = "No se pudo generar contenido. Intenta más tarde."
         return title, content
 
     except Exception as e:
@@ -106,12 +105,11 @@ def publish_to_wordpress(title, content, status='publish'):
         return False, f"Error al publicar: {response.status_code} - {response.text}"
 
 def start(update, context):
-    update.message.reply_text("¡Hola! ¿Sobre qué tema quieres generar un post?")
+    update.message.reply_text("👋 ¡Hola! ¿Sobre qué tema quieres generar un post?")
     return TEMA
 
 def animated_loading(message, base_text="Generando"):
     stop_flag = threading.Event()
-
     def animate():
         states = [f"⏳ {base_text}", f"⏳ {base_text}.", f"⏳ {base_text}..", f"⏳ {base_text}..."]
         i = 0
@@ -122,25 +120,31 @@ def animated_loading(message, base_text="Generando"):
                 i += 1
             except Exception:
                 break
-
     thread = threading.Thread(target=animate)
     thread.start()
     return stop_flag
 
+def diff_highlight(original, modified):
+    differ = difflib.ndiff(original.split(), modified.split())
+    result = []
+    for word in differ:
+        if word.startswith("+ "):
+            result.append(f"<u>{word[2:]}</u>")
+        elif word.startswith("  "):
+            result.append(word[2:])
+    return ' '.join(result)
+
 def handle_message(update, context):
     user_id = update.effective_user.id
     tema = update.message.text.strip()
-
     loading_message = update.message.reply_text("⏳ Generando.")
     stop_flag = animated_loading(loading_message, base_text="Generando")
-
     title, content = generate_content(tema)
     user_posts[user_id] = {"title": title, "content": content, "tema": tema}
-
     stop_flag.set()
 
     update.message.reply_text(
-        f"📝 <b>Título:</b> {title}\n\n{content}",
+        f"📝 <b>{title}</b>\n\n{content}",
         parse_mode=telegram.ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
@@ -156,9 +160,8 @@ def button_callback(update, context):
     query.answer()
     user_id = query.from_user.id
     data = query.data
-
     if user_id not in user_posts:
-        query.edit_message_text("No hay ningún post en progreso.")
+        query.edit_message_text("⚠️ No hay ningún post en progreso.")
         return ConversationHandler.END
 
     post = user_posts[user_id]
@@ -166,10 +169,8 @@ def button_callback(update, context):
     if data == "publicar":
         msg = bot.send_message(chat_id=user_id, text="📤 Publicando...")
         stop_flag = animated_loading(msg, base_text="Publicando")
-
         success, response = publish_to_wordpress(post['title'], post['content'], 'publish')
         stop_flag.set()
-
         if success:
             del user_posts[user_id]
             bot.send_message(chat_id=user_id, text=f"✅ ¡Publicado!\n🔗 {response.get('link')}")
@@ -180,14 +181,12 @@ def button_callback(update, context):
     elif data == "rehacer":
         msg = bot.send_message(chat_id=user_id, text="♻️ Rehaciendo propuesta...")
         stop_flag = animated_loading(msg, base_text="Generando")
-
         title, content = generate_content(post['tema'])
         user_posts[user_id] = {"title": title, "content": content, "tema": post['tema']}
         stop_flag.set()
-
         bot.send_message(
             chat_id=user_id,
-            text=f"🔁 <b>Título:</b> {title}\n\n{content}",
+            text=f"🔁 <b>{title}</b>\n\n{content}",
             parse_mode=telegram.ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
@@ -212,11 +211,10 @@ def handle_sugerencias(update, context):
     sugerencias = update.message.text.strip()
     tema_original = user_posts[user_id]['tema']
     contenido_actual = user_posts[user_id]['content']
-
     prompt = (
         f"Este es el contenido anterior de un artículo de blog:\n\n{contenido_actual}\n\n"
         f"Estas son sugerencias del usuario para mejorarlo:\n{sugerencias}\n\n"
-        "Realiza una versión mejorada teniendo en cuenta las sugerencias. Devuelve únicamente un JSON con 'title' y 'content'."
+        "Realiza una versión mejorada respetando la estructura anterior. Devuelve solo un JSON con 'title' y 'content'."
     )
 
     msg = update.message.reply_text("🛠️ Aplicando sugerencias...")
@@ -226,27 +224,20 @@ def handle_sugerencias(update, context):
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "Eres un asistente experto en contenido de blog. Me tienes que devolver solamente en JSON con 'title' y 'content'."},
+                {"role": "system", "content": "Eres un asistente experto en redacción. Devuelve solo un JSON con 'title' y 'content'."},
                 {"role": "user", "content": prompt}
             ]
         )
-        content = response['choices'][0]['message']['content'].strip()
-
-        try:
-            post_data = json.loads(content)
-            title = post_data.get("title", "Título")
-            content = clean_html(post_data.get("content", "Contenido"))
-        except json.JSONDecodeError:
-            stop_flag.set()
-            logger.error(f"Respuesta no es JSON válida: {content}")
-            update.message.reply_text("⚠️ La respuesta del modelo no es válida. Intenta nuevamente.")
-            return PROPUESTA
-
-        user_posts[user_id] = {"title": title, "content": content, "tema": tema_original}
+        result = response['choices'][0]['message']['content'].strip()
+        post_data = json.loads(result)
+        title = post_data.get("title", tema_original)
+        nuevo_content = clean_html(post_data.get("content", contenido_actual))
+        highlighted = diff_highlight(contenido_actual, nuevo_content)
+        user_posts[user_id] = {"title": title, "content": nuevo_content, "tema": tema_original}
         stop_flag.set()
 
         update.message.reply_text(
-            f"📝 <b>Título:</b> {title}\n\n{content}",
+            f"📝 <b>{title}</b>\n\n{highlighted}",
             parse_mode=telegram.ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
@@ -287,7 +278,7 @@ def webhook():
 
 @app.route('/')
 def index():
-    return 'Bot activo con botones!'
+    return '🤖 Bot activo con botones y animaciones'
 
 @app.route('/set_webhook')
 def set_webhook():
@@ -298,5 +289,6 @@ def set_webhook():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+
 
 
