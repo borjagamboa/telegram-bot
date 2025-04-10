@@ -52,6 +52,7 @@ def get_config():
 telegram_token, wp_url, wp_user, wp_password, openai_api_key = get_config()
 bot = telegram.Bot(token=telegram_token)
 openai.api_key = openai_api_key
+openai_model = 'gpt-3.5-turbo-instruct'
 
 def clean_html(content):
     clean = re.compile("<.*?>")
@@ -60,7 +61,7 @@ def clean_html(content):
 def generate_content(tema, tone="informativo"):
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model=openai_model,
             messages=[
                 {"role": "system", "content": "Eres un asistente experto en generación de contenido de blog y en neurorrehabilitación. Devuelve solo un JSON con 'title' y 'content'."},
                 {"role": "user", "content": f"Genera un título atractivo con un emoji al inicio y un artículo de blog sobre: {tema}. Pon algún emoji también en el texto. Devuélvelo en JSON usando los tags title y content. No añadas comentarios a tu respuesta. Máximo 1000 palabras."}
@@ -222,7 +223,7 @@ def handle_sugerencias(update, context):
 
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model=openai_model,
             messages=[
                 {"role": "system", "content": "Eres un asistente experto en redacción. Devuelve solo un JSON con 'title' y 'content'."},
                 {"role": "user", "content": prompt}
