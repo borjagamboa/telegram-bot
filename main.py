@@ -63,7 +63,7 @@ def generate_content(tema, tone="informativo"):
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "Eres un asistente experto en generación de contenido de blog y en neurorrehabilitación. Devuelve solo un JSON con 'title' y 'content'."},
-                {"role": "user", "content": f"Genera un título atractivo con un emoji al inicio y un artículo de blog sobre: {tema}. Devuélvelo en JSON usando los tags title y content. Máximo 700 palabras."}
+                {"role": "user", "content": f"Genera un título atractivo con un emoji al inicio y un artículo de blog sobre: {tema}. Pon algún emoji también en el texto. Devuélvelo en JSON usando los tags title y content. No añadas comentarios a tu respuesta. Máximo 1000 palabras."}
             ]
         )
         content = response['choices'][0]['message']['content'].strip()
@@ -214,7 +214,7 @@ def handle_sugerencias(update, context):
     prompt = (
         f"Este es el contenido anterior de un artículo de blog:\n\n{contenido_actual}\n\n"
         f"Estas son sugerencias del usuario para mejorarlo:\n{sugerencias}\n\n"
-        "Realiza una versión mejorada respetando la estructura anterior. Devuelve solo un JSON con 'title' y 'content'."
+        "Realiza una versión mejorada pero no modifiques más de lo necesario. Devuelve solo un JSON con 'title' y 'content'. No añadas comentarios a tu respuesta. Máximo 1000 palabras."
     )
 
     msg = update.message.reply_text("🛠️ Aplicando sugerencias...")
