@@ -238,7 +238,7 @@ def handle_sugerencias(update, context):
     stop_flag = animated_loading(msg, base_text="Generando")
 
     try:
-        if model == "gpt-3.5-turbo-instruct":
+        if openai_model == "gpt-3.5-turbo-instruct":
             # Usamos el endpoint completions para el modelo instruct
             response = openai.Completion.create(
                 model=openai_model,
