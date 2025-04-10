@@ -68,17 +68,14 @@ def obtener_color_precio(modelo):
     }
     return precios.get(modelo, ("Desconocido", "gray"))
     
-# Función para seleccionar modelo
 def seleccionar_modelo(update, context):
-    keyboard = [
-        [InlineKeyboardButton(f"GPT-3.5 Turbo - {obtener_color_precio('gpt-3.5-turbo')[0]}", callback_data="modelo_gpt-3.5-turbo")],
-        [InlineKeyboardButton(f"GPT-3.5 Instruct - {obtener_color_precio('gpt-3.5-turbo-instruct')[0]}", callback_data="modelo_gpt-3.5-turbo-instruct")],
-        [InlineKeyboardButton(f"GPT-4 - {obtener_color_precio('gpt-4')[0]}", callback_data="modelo_gpt-4")],
-        [InlineKeyboardButton(f"GPT-4 Turbo - {obtener_color_precio('gpt-4-turbo')[0]}", callback_data="modelo_gpt-4-turbo")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text("Selecciona el modelo de OpenAI que quieres usar:", reply_markup=reply_markup)
-    return MODELO
+    query = update.callback_query
+    query.answer()
+    selected_model = query.data
+    context.user_data['modelo'] = selected_model  # Guardamos el modelo elegido
+    user_id = query.from_user.id
+    bot.send_message(chat_id=user_id, text=f"✅ Modelo seleccionado: {selected_model}\n\n🧠 Ahora dime el tema del post.")
+    return TEMA
 
 def generate_content(tema, tone="informativo", model="gpt-3.5-turbo"):
     try:
@@ -144,8 +141,16 @@ def publish_to_wordpress(title, content, status='publish'):
         return False, f"Error al publicar: {response.status_code} - {response.text}"
 
 def start(update, context):
-    update.message.reply_text("👋 ¡Hola! ¿Qué modelo quieres que utilice?")
+    keyboard = [
+        [InlineKeyboardButton("GPT-3.5 Turbo 💸 Muy barato", callback_data="gpt-3.5-turbo")],
+        [InlineKeyboardButton("GPT-3.5 Instruct 💵 Barato", callback_data="gpt-3.5-turbo-instruct")],
+        [InlineKeyboardButton("GPT-4 💰 Caro", callback_data="gpt-4")],
+        [InlineKeyboardButton("GPT-4 Turbo 💎 Muy caro", callback_data="gpt-4-turbo")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text("👋 ¡Hola! ¿Con qué modelo de OpenAI quieres trabajar?", reply_markup=reply_markup)
     return MODELO
+
 
 def animated_loading(message, base_text="Generando"):
     stop_flag = threading.Event()
@@ -331,7 +336,7 @@ dispatcher = Dispatcher(bot, None, workers=0)
 conv_handler = ConversationHandler(
     entry_points=[MessageHandler(Filters.command, start)],
     states={
-        MODELO: [CallbackQueryHandler(handle_model_selection)],
+        MODELO: [CallbackQueryHandler(seleccionar_modelo)],
         TEMA: [MessageHandler(Filters.text & ~Filters.command, handle_message)],
         PROPUESTA: [CallbackQueryHandler(button_callback)],
         SUGERENCIAS: [MessageHandler(Filters.text & ~Filters.command, handle_sugerencias)],
