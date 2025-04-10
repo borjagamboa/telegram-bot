@@ -25,7 +25,7 @@ app = Flask(__name__)
 user_posts = {}
 
 # Estados para ConversationHandler
-TEMA, PROPUESTA, SUGERENCIAS = range(3)
+TEMA, PROPUESTA, SUGERENCIAS, SELECCION_MODELO = range(4)
 
 def access_secret(secret_id):
     client = secretmanager.SecretManagerServiceClient()
@@ -52,16 +52,18 @@ def get_config():
 telegram_token, wp_url, wp_user, wp_password, openai_api_key = get_config()
 bot = telegram.Bot(token=telegram_token)
 openai.api_key = openai_api_key
-openai_model = 'gpt-3.5-turbo-instruct'
+
+# Modelo por defecto
+openai_model = 'gpt-3.5-turbo'
 
 def clean_html(content):
     clean = re.compile("<.*?>")
     return re.sub(clean, "", content)
 
-def generate_content(tema, tone="informativo"):
+def generate_content(tema, tone="informativo", model="gpt-3.5-turbo"):
     try:
         response = openai.ChatCompletion.create(
-            model=openai_model,
+            model=model,
             messages=[
                 {"role": "system", "content": "Eres un asistente experto en generación de contenido de blog y en neurorrehabilitación. Devuelve solo un JSON con 'title' y 'content'."},
                 {"role": "user", "content": f"Genera un título atractivo con un emoji al inicio y un artículo de blog sobre: {tema}. Pon algún emoji también en el texto. Devuélvelo en JSON usando los tags title y content. No añadas comentarios a tu respuesta. Máximo 1000 palabras."}
@@ -106,8 +108,12 @@ def publish_to_wordpress(title, content, status='publish'):
         return False, f"Error al publicar: {response.status_code} - {response.text}"
 
 def start(update, context):
-    update.message.reply_text("👋 ¡Hola! ¿Sobre qué tema quieres generar un post?")
-    return TEMA
+    update.message.reply_text(
+        "👋 ¡Hola! ¿Sobre qué tema quieres generar un post?\n"
+        "Primero, elige el modelo que prefieres usar:\n"
+        "1. GPT-3.5\n2. GPT-3.5 Turbo\n3. GPT-4"
+    )
+    return SELECCION_MODELO
 
 def animated_loading(message, base_text="Generando"):
     stop_flag = threading.Event()
@@ -140,7 +146,7 @@ def handle_message(update, context):
     tema = update.message.text.strip()
     loading_message = update.message.reply_text("⏳ Generando.")
     stop_flag = animated_loading(loading_message, base_text="Generando")
-    title, content = generate_content(tema)
+    title, content = generate_content(tema, model=context.user_data['selected_model'])
     user_posts[user_id] = {"title": title, "content": content, "tema": tema}
     stop_flag.set()
 
@@ -182,7 +188,7 @@ def button_callback(update, context):
     elif data == "rehacer":
         msg = bot.send_message(chat_id=user_id, text="♻️ Rehaciendo propuesta...")
         stop_flag = animated_loading(msg, base_text="Generando")
-        title, content = generate_content(post['tema'])
+        title, content = generate_content(post['tema'], model=context.user_data['selected_model'])
         user_posts[user_id] = {"title": title, "content": content, "tema": post['tema']}
         stop_flag.set()
         bot.send_message(
@@ -223,7 +229,7 @@ def handle_sugerencias(update, context):
 
     try:
         response = openai.ChatCompletion.create(
-            model=openai_model,
+            model=context.user_data['selected_model'],
             messages=[
                 {"role": "system", "content": "Eres un asistente experto en redacción. Devuelve solo un JSON con 'title' y 'content'."},
                 {"role": "user", "content": prompt}
@@ -261,6 +267,7 @@ dispatcher = Dispatcher(bot, None, workers=0)
 conv_handler = ConversationHandler(
     entry_points=[MessageHandler(Filters.command, start)],
     states={
+        SELECCION_MODELO: [MessageHandler(Filters.text & ~Filters.command, handle_model_selection)],
         TEMA: [MessageHandler(Filters.text & ~Filters.command, handle_message)],
         PROPUESTA: [CallbackQueryHandler(button_callback)],
         SUGERENCIAS: [MessageHandler(Filters.text & ~Filters.command, handle_sugerencias)],
@@ -290,6 +297,3 @@ def set_webhook():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
-
-
-
