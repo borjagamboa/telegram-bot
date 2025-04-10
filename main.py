@@ -60,7 +60,7 @@ def generate_content(tema, tone="informativo"):
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[ 
+            messages=[
                 {"role": "system", "content": "Eres un asistente experto en generación de contenido y en neurorrehabilitación. Genera un título atractivo y un contenido para un blog en formato JSON."},
                 {"role": "user", "content": f"Genera un título atractivo y un artículo de blog sobre: {tema}. Devuélvelo en json usando los tags title y content. Máximo 700 palabras. No añadas comentarios"}
             ]
@@ -109,11 +109,11 @@ def start(update, context):
     update.message.reply_text("¡Hola! ¿Sobre qué tema quieres generar un post?")
     return TEMA
 
-def animated_loading(message):
+def animated_loading(message, base_text="Generando"):
     stop_flag = threading.Event()
 
     def animate():
-        states = ["⏳ Generando.", "⏳ Generando..", "⏳ Generando..."]
+        states = [f"⏳ {base_text}", f"⏳ {base_text}.", f"⏳ {base_text}..", f"⏳ {base_text}..."]
         i = 0
         while not stop_flag.is_set():
             try:
@@ -130,12 +130,10 @@ def animated_loading(message):
 def handle_message(update, context):
     user_id = update.effective_user.id
     tema = update.message.text.strip()
+
     loading_message = update.message.reply_text("⏳ Generando.")
+    stop_flag = animated_loading(loading_message, base_text="Generando")
 
-    # Animación
-    stop_flag = animated_loading(loading_message)
-
-    # Generar contenido
     title, content = generate_content(tema)
     user_posts[user_id] = {"title": title, "content": content, "tema": tema}
 
@@ -144,7 +142,7 @@ def handle_message(update, context):
     update.message.reply_text(
         f"📝 <b>Título:</b> {title}\n\n{content}",
         parse_mode=telegram.ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup([  
+        reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
             [InlineKeyboardButton("✏️ Sugerir cambios", callback_data="cambios")],
             [InlineKeyboardButton("🆕 Cambiar tema", callback_data="cambiar")],
@@ -166,8 +164,12 @@ def button_callback(update, context):
     post = user_posts[user_id]
 
     if data == "publicar":
-        query.edit_message_text("📤 Publicando en WordPress...")
+        msg = bot.send_message(chat_id=user_id, text="📤 Publicando...")
+        stop_flag = animated_loading(msg, base_text="Publicando")
+
         success, response = publish_to_wordpress(post['title'], post['content'], 'publish')
+        stop_flag.set()
+
         if success:
             del user_posts[user_id]
             bot.send_message(chat_id=user_id, text=f"✅ ¡Publicado!\n🔗 {response.get('link')}")
@@ -177,7 +179,7 @@ def button_callback(update, context):
 
     elif data == "rehacer":
         msg = bot.send_message(chat_id=user_id, text="♻️ Rehaciendo propuesta...")
-        stop_flag = animated_loading(msg)
+        stop_flag = animated_loading(msg, base_text="Generando")
 
         title, content = generate_content(post['tema'])
         user_posts[user_id] = {"title": title, "content": content, "tema": post['tema']}
@@ -187,7 +189,7 @@ def button_callback(update, context):
             chat_id=user_id,
             text=f"🔁 <b>Título:</b> {title}\n\n{content}",
             parse_mode=telegram.ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([  
+            reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
                 [InlineKeyboardButton("✏️ Sugerir cambios", callback_data="cambios")],
                 [InlineKeyboardButton("🆕 Cambiar tema", callback_data="cambiar")],
@@ -214,17 +216,17 @@ def handle_sugerencias(update, context):
     prompt = (
         f"Este es el contenido anterior de un artículo de blog:\n\n{contenido_actual}\n\n"
         f"Estas son sugerencias del usuario para mejorarlo:\n{sugerencias}\n\n"
-        "Realiza una versión mejorada teniendo en cuenta las sugerencias. Devuelve un JSON con 'title' y 'content'."
+        "Realiza una versión mejorada teniendo en cuenta las sugerencias. Devuelve únicamente un JSON con 'title' y 'content'."
     )
 
     msg = update.message.reply_text("🛠️ Aplicando sugerencias...")
-    stop_flag = animated_loading(msg)
+    stop_flag = animated_loading(msg, base_text="Generando")
 
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "Eres un asistente experto en contenido de blog. Devuelve el resultado en JSON."},
+                {"role": "system", "content": "Eres un asistente experto en contenido de blog. Me tienes que devolver solamente en JSON con 'title' y 'content'."},
                 {"role": "user", "content": prompt}
             ]
         )
@@ -246,7 +248,7 @@ def handle_sugerencias(update, context):
         update.message.reply_text(
             f"📝 <b>Título:</b> {title}\n\n{content}",
             parse_mode=telegram.ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([  
+            reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
                 [InlineKeyboardButton("✏️ Sugerir cambios", callback_data="cambios")],
                 [InlineKeyboardButton("🆕 Cambiar tema", callback_data="cambiar")],
@@ -261,8 +263,7 @@ def handle_sugerencias(update, context):
         update.message.reply_text("⚠️ Ocurrió un error al procesar tus sugerencias. Inténtalo de nuevo.")
         return PROPUESTA
 
-
-# Configurar dispatcher y handlers globales
+# Dispatcher y webhook
 dispatcher = Dispatcher(bot, None, workers=0)
 
 conv_handler = ConversationHandler(
@@ -297,4 +298,5 @@ def set_webhook():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+
 
