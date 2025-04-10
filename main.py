@@ -25,7 +25,7 @@ app = Flask(__name__)
 user_posts = {}
 
 # Estados para ConversationHandler
-TEMA, PROPUESTA, SUGERENCIAS = range(3)
+MODELO, TEMA, PROPUESTA, SUGERENCIAS = range(4)
 
 def access_secret(secret_id):
     client = secretmanager.SecretManagerServiceClient()
@@ -57,6 +57,28 @@ openai_model = 'gpt-3.5-turbo-instruct'
 def clean_html(content):
     clean = re.compile("<.*?>")
     return re.sub(clean, "", content)
+
+# Aquí agregamos una función para obtener las etiquetas con colores
+def obtener_color_precio(modelo):
+    precios = {
+        "gpt-3.5-turbo": ("Muy barato", "green"),
+        "gpt-3.5-turbo-instruct": ("Barato", "yellow"),
+        "gpt-4": ("Caro", "orange"),
+        "gpt-4-turbo": ("Muy caro", "red")
+    }
+    return precios.get(modelo, ("Desconocido", "gray"))
+    
+# Función para seleccionar modelo
+def seleccionar_modelo(update, context):
+    keyboard = [
+        [InlineKeyboardButton(f"GPT-3.5 Turbo - {obtener_color_precio('gpt-3.5-turbo')[0]}", callback_data="modelo_gpt-3.5-turbo")],
+        [InlineKeyboardButton(f"GPT-3.5 Instruct - {obtener_color_precio('gpt-3.5-turbo-instruct')[0]}", callback_data="modelo_gpt-3.5-turbo-instruct")],
+        [InlineKeyboardButton(f"GPT-4 - {obtener_color_precio('gpt-4')[0]}", callback_data="modelo_gpt-4")],
+        [InlineKeyboardButton(f"GPT-4 Turbo - {obtener_color_precio('gpt-4-turbo')[0]}", callback_data="modelo_gpt-4-turbo")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text("Selecciona el modelo de OpenAI que quieres usar:", reply_markup=reply_markup)
+    return MODELO
 
 def generate_content(tema, tone="informativo", model="gpt-3.5-turbo"):
     try:
@@ -122,8 +144,8 @@ def publish_to_wordpress(title, content, status='publish'):
         return False, f"Error al publicar: {response.status_code} - {response.text}"
 
 def start(update, context):
-    update.message.reply_text("👋 ¡Hola! ¿Sobre qué tema quieres generar un post?")
-    return TEMA
+    update.message.reply_text("👋 ¡Hola! ¿Qué modelo quieres que utilice?")
+    return MODELO
 
 def animated_loading(message, base_text="Generando"):
     stop_flag = threading.Event()
@@ -151,12 +173,21 @@ def diff_highlight(original, modified):
             result.append(word[2:])
     return ' '.join(result)
 
+def handle_model_selection(update, context):
+    query = update.callback_query
+    query.answer()
+    model = query.data.replace("modelo_", "")
+    context.user_data["modelo"] = model
+    query.edit_message_text(f"✅ Modelo seleccionado: {model}\n\nAhora, dime el tema para el post.")
+    return TEMA
+
 def handle_message(update, context):
     user_id = update.effective_user.id
     tema = update.message.text.strip()
+    model = context.user_data.get("modelo", "gpt-3.5-turbo")
     loading_message = update.message.reply_text("⏳ Generando.")
     stop_flag = animated_loading(loading_message, base_text="Generando")
-    title, content = generate_content(tema, openai_model)
+    title, content = generate_content(tema, model)
     user_posts[user_id] = {"title": title, "content": content, "tema": tema}
     stop_flag.set()
 
@@ -176,6 +207,7 @@ def button_callback(update, context):
     query = update.callback_query
     query.answer()
     user_id = query.from_user.id
+    model = context.user_data.get("modelo", "gpt-3.5-turbo")
     data = query.data
     if user_id not in user_posts:
         query.edit_message_text("⚠️ No hay ningún post en progreso.")
@@ -198,7 +230,7 @@ def button_callback(update, context):
     elif data == "rehacer":
         msg = bot.send_message(chat_id=user_id, text="♻️ Rehaciendo propuesta...")
         stop_flag = animated_loading(msg, base_text="Generando")
-        title, content = generate_content(post['tema'], openai_model)
+        title, content = generate_content(post['tema'], model)
         user_posts[user_id] = {"title": title, "content": content, "tema": post['tema']}
         stop_flag.set()
         bot.send_message(
@@ -225,9 +257,11 @@ def button_callback(update, context):
 
 def handle_sugerencias(update, context):
     user_id = update.effective_user.id
+    model = context.user_data.get("modelo", "gpt-3.5-turbo")
     sugerencias = update.message.text.strip()
     tema_original = user_posts[user_id]['tema']
     contenido_actual = user_posts[user_id]['content']
+    
     prompt = (
         f"Este es el contenido anterior de un artículo de blog:\n\n{contenido_actual}\n\n"
         f"Estas son sugerencias del usuario para mejorarlo:\n{sugerencias}\n\n"
@@ -238,7 +272,7 @@ def handle_sugerencias(update, context):
     stop_flag = animated_loading(msg, base_text="Generando")
 
     try:
-        if openai_model == "gpt-3.5-turbo-instruct":
+        if model == "gpt-3.5-turbo-instruct":
             # Usamos el endpoint completions para el modelo instruct
             response = openai.Completion.create(
                 model=openai_model,
@@ -251,7 +285,7 @@ def handle_sugerencias(update, context):
         else:
             # Usamos el modelo chat (gpt-3.5-turbo por defecto)
             response = openai.ChatCompletion.create(
-                model=openai_model,
+                model="gpt-3.5-turbo",
                 messages=[ 
                     {"role": "system", "content": "Eres un asistente experto en generación de contenido y en neurorrehabilitación. Genera un título atractivo y un contenido para un blog en formato JSON."},
                     {"role": "user", "content": promp}
@@ -297,6 +331,7 @@ dispatcher = Dispatcher(bot, None, workers=0)
 conv_handler = ConversationHandler(
     entry_points=[MessageHandler(Filters.command, start)],
     states={
+        MODELO: [CallbackQueryHandler(handle_model_selection)],
         TEMA: [MessageHandler(Filters.text & ~Filters.command, handle_message)],
         PROPUESTA: [CallbackQueryHandler(button_callback)],
         SUGERENCIAS: [MessageHandler(Filters.text & ~Filters.command, handle_sugerencias)],
