@@ -238,13 +238,26 @@ def handle_sugerencias(update, context):
     stop_flag = animated_loading(msg, base_text="Generando")
 
     try:
-        response = openai.ChatCompletion.create(
-            model=openai_model,
-            messages=[
-                {"role": "system", "content": "Eres un asistente experto en redacción. Devuelve solo un JSON con 'title' y 'content'."},
-                {"role": "user", "content": prompt}
-            ]
-        )
+        if model == "gpt-3.5-turbo-instruct":
+            # Usamos el endpoint completions para el modelo instruct
+            response = openai.Completion.create(
+                model=model,
+                prompt,
+                max_tokens=700,
+                n=1,
+                stop=None,
+                temperature=0.7
+            )
+        else:
+            # Usamos el modelo chat (gpt-3.5-turbo por defecto)
+            response = openai.ChatCompletion.create(
+                model=model,
+                messages=[ 
+                    {"role": "system", "content": "Eres un asistente experto en generación de contenido y en neurorrehabilitación. Genera un título atractivo y un contenido para un blog en formato JSON."},
+                    {"role": "user", "content": promp}
+                ]
+            )
+
         result = response['choices'][0]['message']['content'].strip()
         post_data = json.loads(result)
         title = post_data.get("title", tema_original)
