@@ -64,7 +64,7 @@ def generate_content(tema, tone="informativo", model="gpt-3.5-turbo"):
     try:
         response = openai.ChatCompletion.create(
             model=model,
-            messages=[
+            messages=[ 
                 {"role": "system", "content": "Eres un asistente experto en generación de contenido de blog y en neurorrehabilitación. Devuelve solo un JSON con 'title' y 'content'."},
                 {"role": "user", "content": f"Genera un título atractivo con un emoji al inicio y un artículo de blog sobre: {tema}. Pon algún emoji también en el texto. Devuélvelo en JSON usando los tags title y content. No añadas comentarios a tu respuesta. Máximo 1000 palabras."}
             ]
@@ -115,6 +115,25 @@ def start(update, context):
     )
     return SELECCION_MODELO
 
+def handle_model_selection(update, context):
+    user_id = update.effective_user.id
+    selected_model = update.message.text.strip()
+
+    # Validación del modelo
+    valid_models = ['gpt-3.5', 'gpt-3.5-turbo', 'gpt-4']
+    
+    if selected_model not in valid_models:
+        update.message.reply_text(f"⚠️ El modelo '{selected_model}' no es válido. Por favor selecciona uno de los siguientes:\n"
+                                  f"{', '.join(valid_models)}")
+        return SELECCION_MODELO
+    
+    # Almacenar el modelo seleccionado
+    context.user_data['selected_model'] = selected_model
+
+    # Confirmación
+    update.message.reply_text(f"✅ Has seleccionado el modelo: {selected_model}. Ahora, ¿sobre qué tema quieres generar un post?")
+    return TEMA
+
 def animated_loading(message, base_text="Generando"):
     stop_flag = threading.Event()
     def animate():
@@ -153,7 +172,7 @@ def handle_message(update, context):
     update.message.reply_text(
         f"📝 <b>{title}</b>\n\n{content}",
         parse_mode=telegram.ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup([
+        reply_markup=InlineKeyboardMarkup([ 
             [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
             [InlineKeyboardButton("✏️ Sugerir cambios", callback_data="cambios")],
             [InlineKeyboardButton("🆕 Cambiar tema", callback_data="cambiar")],
@@ -195,7 +214,7 @@ def button_callback(update, context):
             chat_id=user_id,
             text=f"🔁 <b>{title}</b>\n\n{content}",
             parse_mode=telegram.ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([
+            reply_markup=InlineKeyboardMarkup([ 
                 [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
                 [InlineKeyboardButton("✏️ Sugerir cambios", callback_data="cambios")],
                 [InlineKeyboardButton("🆕 Cambiar tema", callback_data="cambiar")],
@@ -230,7 +249,7 @@ def handle_sugerencias(update, context):
     try:
         response = openai.ChatCompletion.create(
             model=context.user_data['selected_model'],
-            messages=[
+            messages=[ 
                 {"role": "system", "content": "Eres un asistente experto en redacción. Devuelve solo un JSON con 'title' y 'content'."},
                 {"role": "user", "content": prompt}
             ]
@@ -246,7 +265,7 @@ def handle_sugerencias(update, context):
         update.message.reply_text(
             f"📝 <b>{title}</b>\n\n{highlighted}",
             parse_mode=telegram.ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([
+            reply_markup=InlineKeyboardMarkup([ 
                 [InlineKeyboardButton("🔄 Rehacer propuesta", callback_data="rehacer")],
                 [InlineKeyboardButton("✏️ Sugerir cambios", callback_data="cambios")],
                 [InlineKeyboardButton("🆕 Cambiar tema", callback_data="cambiar")],
@@ -272,28 +291,11 @@ conv_handler = ConversationHandler(
         PROPUESTA: [CallbackQueryHandler(button_callback)],
         SUGERENCIAS: [MessageHandler(Filters.text & ~Filters.command, handle_sugerencias)],
     },
-    fallbacks=[MessageHandler(Filters.command, start)]
+    fallbacks=[],
 )
 
 dispatcher.add_handler(conv_handler)
 
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    if request.method == "POST":
-        update = telegram.Update.de_json(request.get_json(force=True), bot)
-        dispatcher.process_update(update)
-    return 'ok'
-
-@app.route('/')
-def index():
-    return '🤖 Bot activo con botones y animaciones'
-
-@app.route('/set_webhook')
-def set_webhook():
-    url = request.url_root.replace('http://', 'https://')
-    webhook_url = url + 'webhook'
-    success = bot.set_webhook(webhook_url)
-    return f'Webhook {"configurado" if success else "fallido"}: {webhook_url}'
-
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
