@@ -58,26 +58,42 @@ def clean_html(content):
     clean = re.compile("<.*?>")
     return re.sub(clean, "", content)
 
-def generate_content(tema, tone="informativo"):
+def generate_content(tema, tone="informativo", model="gpt-3.5-turbo"):
     try:
-        response = openai.ChatCompletion.create(
-            model=openai_model,
-            messages=[
-                {"role": "system", "content": "Eres un asistente experto en generación de contenido de blog y en neurorrehabilitación. Devuelve solo un JSON con 'title' y 'content'."},
-                {"role": "user", "content": f"Genera un título atractivo con un emoji al inicio y un artículo de blog sobre: {tema}. Pon algún emoji también en el texto. Devuélvelo en JSON usando los tags title y content. No añadas comentarios a tu respuesta. Máximo 1000 palabras."}
-            ]
-        )
-        content = response['choices'][0]['message']['content'].strip()
+        if model == "gpt-3.5-turbo-instruct":
+            # Usamos el endpoint completions para el modelo instruct
+            response = openai.Completion.create(
+                model=model,
+                prompt=f"Genera un título atractivo y un artículo de blog sobre: {tema}. Usa algún emoji. Devuélvelo en formato JSON con los tags 'title' y 'content'. El artículo debe incluir al menos un emoji relevante. Máximo 1000 palabras. No añadas comentarios.",
+                max_tokens=700,
+                n=1,
+                stop=None,
+                temperature=0.7
+            )
+            response_content = response.choices[0].text.strip()
+        else:
+            # Usamos el modelo chat (gpt-3.5-turbo por defecto)
+            response = openai.ChatCompletion.create(
+                model=model,
+                messages=[ 
+                    {"role": "system", "content": "Eres un asistente experto en generación de contenido y en neurorrehabilitación. Genera un título atractivo y un contenido para un blog en formato JSON."},
+                    {"role": "user", "content": f"Genera un título atractivo y un artículo de blog sobre: {tema}. Devuélvelo en json usando los tags title y content. El artículo debe incluir al menos un emoji relevante. Máximo 1000 palabras. No añadas comentarios"}
+                ]
+            )
+            response_content = response['choices'][0]['message']['content'].strip()
+
         try:
-            post_data = json.loads(content)
+            post_data = json.loads(response_content)
             title = post_data.get("title", "Título no encontrado")
             content = post_data.get("content", "Contenido no encontrado")
         except json.JSONDecodeError:
-            logger.error(f"Error al decodificar JSON: {content}")
+            logger.error(f"Error al decodificar la respuesta JSON: {response_content}")
             title = "Error generando título"
             content = "Error generando contenido."
 
         content = clean_html(content)
+        if not content:
+            content = "No se pudo generar contenido. Intenta más tarde."
         return title, content
 
     except Exception as e:
