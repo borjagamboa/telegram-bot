@@ -54,6 +54,13 @@ bot = telegram.Bot(token=telegram_token)
 openai.api_key = openai_api_key
 openai_model = 'gpt-3.5-turbo-instruct'
 
+def clean_response_json(content):
+    # Elimina bloque de código Markdown si está presente
+    if content.startswith("```"):
+        content = re.sub(r"^```(?:json)?\s*", "", content)
+        content = re.sub(r"\s*```$", "", content)
+    return content.strip()
+
 def clean_html(content):
     clean = re.compile("<.*?>")
     return re.sub(clean, "", content)
@@ -293,11 +300,12 @@ def handle_sugerencias(update, context):
                 model="gpt-3.5-turbo",
                 messages=[ 
                     {"role": "system", "content": "Eres un asistente experto en generación de contenido y en neurorrehabilitación. Genera un título atractivo y un contenido para un blog en formato JSON."},
-                    {"role": "user", "content": promp}
+                    {"role": "user", "content": prompt}
                 ])
             response_content = response['choices'][0]['message']['content'].strip()
 
         try:
+            response_content = clean_response_json(response_content)
             post_data = json.loads(response_content)
             title = post_data.get("title", "Título no encontrado")
             content = post_data.get("content", contenido_actual)
