@@ -65,7 +65,7 @@ def clean_html(content):
     clean = re.compile("<.*?>")
     return re.sub(clean, "", content)
 
-# Aquí agregamos una función para obtener las etiquetas con colores
+# Agregamos una función para obtener las etiquetas con colores
 def obtener_color_precio(modelo):
     precios = {
         "gpt-3.5-turbo": ("Muy barato", "green"),
