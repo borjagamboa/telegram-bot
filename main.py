@@ -287,7 +287,7 @@ def handle_sugerencias(update, context):
         if model == "gpt-3.5-turbo-instruct":
             # Usamos el endpoint completions para el modelo instruct
             response = openai.Completion.create(
-                model=openai_model,
+                model=model,
                 prompt=prompt,
                 max_tokens=700,
                 n=1,
@@ -297,7 +297,7 @@ def handle_sugerencias(update, context):
         else:
             # Usamos el modelo chat (gpt-3.5-turbo por defecto)
             response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
+                model=model,
                 messages=[ 
                     {"role": "system", "content": "Eres un asistente experto en generación de contenido y en neurorrehabilitación. Genera un título atractivo y un contenido para un blog en formato JSON."},
                     {"role": "user", "content": prompt}
