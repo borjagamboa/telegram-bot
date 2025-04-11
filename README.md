@@ -65,7 +65,7 @@ https://tu_dominio.com/set_webhook
 Este endpoint configurará el webhook y comenzará a recibir actualizaciones de Telegram.
 
 ## 🧑‍💻 Uso
-###Iniciar el Bot
+### Iniciar el Bot
 Una vez que hayas configurado todas las variables de entorno y dependencias, puedes ejecutar el bot con el siguiente comando:
 ```bash
 python app.py
@@ -115,7 +115,7 @@ Aquí se encuentran las funciones que se encargan de la interacción con la API 
 Este archivo incluye funciones auxiliares, como la animación de carga y la limpieza de contenido.
 
 ## ⚖️ Licencia
-Este proyecto está bajo la licencia MIT. Consulta el archivo LICENSE para más detalles.
+¡Ninguna!
 
 ## 🧑‍💻 Contribuciones
 Las contribuciones son bienvenidas. Si tienes alguna sugerencia o encuentras algún error, no dudes en abrir un Issue o enviar un Pull Request.
