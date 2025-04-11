@@ -163,11 +163,9 @@ El proyecto está organizado de la siguiente manera:
 ```bash
 bot-wordpress/
 │
-├── app.py                    # Archivo principal para ejecutar el bot
-├── content.py                # Funciones de generación de contenido con OpenAI
-├── handlers.py               # Lógica de manejo de comandos y respuestas
-├── wordpress.py              # Funciones para publicar en WordPress
-├── utils.py                  # Funciones utilitarias (limpieza de datos, animaciones, etc.)
+├── main.py                   # Archivo principal para ejecutar el bot
+├── app.yaml                  # Configuración de entorno en Google App Engine
+├── cloudbuild.yaml           # Para despliegue automatizado con Google Cloud Build
 ├── requirements.txt          # Dependencias necesarias para el bot
 ├── README.md                 # Este archivo
 └── .env                      # (Opcional) Archivo con las variables de entorno
