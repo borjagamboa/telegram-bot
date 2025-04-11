@@ -32,11 +32,14 @@ Antes de ejecutar el bot, asegúrate de tener los siguientes requisitos:
 ```bash
 git clone https://github.com/tu_usuario/bot-wordpress
 cd bot-wordpress
+```
 
 ### 2. Instala las dependencias
 Asegúrate de tener pip actualizado y luego instala las dependencias requeridas.
 
+```bash
 pip install -r requirements.txt
+```
 
 ### 3. Configuración de variables de entorno
 Debes configurar las siguientes variables de entorno o almacenarlas en Google Cloud Secret Manager:
@@ -56,20 +59,17 @@ Alternativamente, puedes cargar estos secretos desde Google Cloud Secret Manager
 ### 4. Configuración del webhook
 Para que el bot funcione correctamente, debes configurar el webhook en el servidor donde lo hospedes. Esto puede hacerse usando el siguiente endpoint:
 
-bash
-Copiar
-Editar
+```bash
 https://tu_dominio.com/set_webhook
+```
 Este endpoint configurará el webhook y comenzará a recibir actualizaciones de Telegram.
 
 ## 🧑‍💻 Uso
 ###Iniciar el Bot
 Una vez que hayas configurado todas las variables de entorno y dependencias, puedes ejecutar el bot con el siguiente comando:
-
-bash
-Copiar
-Editar
+```bash
 python app.py
+```
 El bot se conectará a Telegram y comenzará a recibir mensajes.
 
 ### Interacción con el Bot
@@ -86,9 +86,7 @@ Finalmente, si el contenido es aprobado, el post será publicado en el sitio de 
 ## 📝 Estructura del Proyecto
 El proyecto está organizado de la siguiente manera:
 
-bash
-Copiar
-Editar
+```bash
 bot-wordpress/
 │
 ├── app.py                    # Archivo principal para ejecutar el bot
@@ -99,6 +97,7 @@ bot-wordpress/
 ├── requirements.txt          # Dependencias necesarias para el bot
 ├── README.md                 # Este archivo
 └── .env                      # (Opcional) Archivo con las variables de entorno
+```
 
 ### app.py
 Este es el archivo principal que ejecuta el bot. Contiene la configuración del webhook y la inicialización del bot de Telegram.
