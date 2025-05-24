@@ -32,8 +32,8 @@ Antes de ejecutar el bot, asegúrate de tener los siguientes requisitos:
 ### 1. Clona este repositorio
 
 ```bash
-git clone https://github.com/tu_usuario/bot-wordpress
-cd bot-wordpress
+git clone https://github.com/tu_usuario/telegram-bot
+cd telegram-bot
 ```
 
 ### 2. Instala las dependencias
